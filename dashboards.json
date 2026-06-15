@@ -1,6 +1,6 @@
 {
   "categories": [
-    { "id": "d2c", "label": "자사몰", "icon": "ShoppingBag", "order": 1 },
+    { "id": "d2c", "label": "바잇미 자사몰", "icon": "ShoppingBag", "order": 1 },
     { "id": "b2b", "label": "B2B", "icon": "Building2", "order": 2 },
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
     { "id": "sku-pricing", "label": "SKU/프라이싱", "icon": "Tag", "order": 4 },
@@ -8,6 +8,17 @@
     { "id": "etc", "label": "기타", "icon": "MoreHorizontal", "order": 6 }
   ],
   "dashboards": [
+    {
+      "slug": "jasamol-dashboard",
+      "name": "자사몰 대시보드",
+      "description": "바잇미 자사몰 실시간 매출/주문/상품 대시보드",
+      "category": "d2c",
+      "path": "https://biteme-jasamol-dashboard.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["자사몰", "매출", "실시간"]
+    },
     {
       "slug": "roi-dashboard",
       "name": "전사 ROI 대시보드",
