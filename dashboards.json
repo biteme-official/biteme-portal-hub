@@ -7,5 +7,17 @@
     { "id": "strategy", "label": "전략/계획", "icon": "Target", "order": 5 },
     { "id": "etc", "label": "기타", "icon": "MoreHorizontal", "order": 6 }
   ],
-  "dashboards": []
+  "dashboards": [
+    {
+      "slug": "roi-dashboard",
+      "name": "전사 ROI 대시보드",
+      "description": "바잇미 전사 ROI 대시보드 (Tableau MCP 연동)",
+      "category": "revenue",
+      "path": "https://biteme-roi-dashboard.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["ROI", "Tableau", "전사"]
+    }
+  ]
 }
