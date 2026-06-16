@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, GitBranch } from "lucide-react";
 import type { Dashboard } from "@/lib/types";
 import { getCategories } from "@/lib/dashboards";
 
@@ -42,7 +42,12 @@ export default function DashboardCard({ dashboard }: { dashboard: Dashboard }) {
       </p>
 
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-text-secondary">{dashboard.owner}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-text-secondary">{dashboard.owner}</span>
+          {dashboard.github && (
+            <GitBranch size={12} className="text-text-secondary" />
+          )}
+        </div>
         <div className="flex gap-1">
           {dashboard.tags.slice(0, 2).map((tag) => (
             <span

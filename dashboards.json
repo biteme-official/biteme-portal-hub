@@ -17,7 +17,8 @@
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["자사몰", "매출", "실시간"]
+      "tags": ["자사몰", "매출", "실시간"],
+      "github": "https://github.com/bmahsang/biteme-jasamol-dashboard"
     },
     {
       "slug": "smartstore-dashboard",
@@ -28,7 +29,8 @@
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["스마트스토어", "매출", "실시간"]
+      "tags": ["스마트스토어", "매출", "실시간"],
+      "github": "https://github.com/bmahsang/biteme-smartstore-dashboard"
     },
     {
       "slug": "product-dashboard",
@@ -39,7 +41,8 @@
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["프로덕트", "현황"]
+      "tags": ["프로덕트", "현황"],
+      "github": "https://github.com/biteme-official/product-dashboard"
     },
     {
       "slug": "roi-dashboard",
@@ -50,7 +53,8 @@
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["ROI", "Tableau", "전사"]
+      "tags": ["ROI", "Tableau", "전사"],
+      "github": "https://github.com/biteme-official/biteme-roi-dashboard"
     }
   ]
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ExternalLink,
+  GitBranch,
   Maximize2,
   Minimize2,
   ChevronRight,
@@ -45,6 +46,17 @@ export default function DashboardViewer({
         </div>
 
         <div className="flex items-center gap-1">
+          {dashboard.github && (
+            <a
+              href={dashboard.github}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-accent hover:bg-surface rounded-md transition-colors no-underline"
+            >
+              <GitBranch size={13} />
+              GitHub
+            </a>
+          )}
           <a
             href={dashboard.path}
             target="_blank"

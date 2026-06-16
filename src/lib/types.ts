@@ -15,6 +15,7 @@ export interface Dashboard {
   status: "active" | "archive";
   owner: string;
   tags: string[];
+  github?: string;
 }
 
 export interface DashboardConfig {
