@@ -1,7 +1,7 @@
 {
   "categories": [
     { "id": "d2c", "label": "실시간 채널 대시보드", "icon": "ShoppingBag", "order": 1 },
-    { "id": "b2b", "label": "B2B", "icon": "Building2", "order": 2 },
+    { "id": "product", "label": "프로덕트", "icon": "Package", "order": 2 },
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
     { "id": "sku-pricing", "label": "SKU/프라이싱", "icon": "Tag", "order": 4 },
     { "id": "strategy", "label": "전략/계획", "icon": "Target", "order": 5 },
@@ -29,6 +29,17 @@
       "status": "active",
       "owner": "전략기획팀",
       "tags": ["스마트스토어", "매출", "실시간"]
+    },
+    {
+      "slug": "product-dashboard",
+      "name": "프로덕트 대시보드",
+      "description": "바잇미 프로덕트 현황 대시보드",
+      "category": "product",
+      "path": "https://md-dashboard-one.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["프로덕트", "현황"]
     },
     {
       "slug": "roi-dashboard",

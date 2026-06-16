@@ -5,7 +5,7 @@ import { getCategories } from "@/lib/dashboards";
 
 const categoryColors: Record<string, string> = {
   d2c: "bg-blue-100 text-blue-700",
-  b2b: "bg-emerald-100 text-emerald-700",
+  product: "bg-emerald-100 text-emerald-700",
   revenue: "bg-purple-100 text-purple-700",
   "sku-pricing": "bg-amber-100 text-amber-700",
   strategy: "bg-rose-100 text-rose-700",

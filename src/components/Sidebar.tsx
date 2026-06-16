@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ShoppingBag,
   Building2,
+  Package,
   TrendingUp,
   Tag,
   Target,
@@ -22,6 +23,7 @@ import {
 const iconMap: Record<string, LucideIcon> = {
   ShoppingBag,
   Building2,
+  Package,
   TrendingUp,
   Tag,
   Target,
