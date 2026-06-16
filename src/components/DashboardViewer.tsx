@@ -17,13 +17,22 @@ export default function DashboardViewer({
 }: {
   dashboard: Dashboard;
 }) {
+  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const categories = getCategories();
   const cat = categories.find((c) => c.id === dashboard.category);
 
-  const iframeSrc =
-    dashboard.type === "external" ? dashboard.path : dashboard.path;
+  const hasTabs = dashboard.tabs && dashboard.tabs.length > 1;
+  const currentPath = hasTabs
+    ? dashboard.tabs![activeTab].path
+    : dashboard.path;
+
+  const handleTabChange = (idx: number) => {
+    if (idx === activeTab) return;
+    setLoading(true);
+    setActiveTab(idx);
+  };
 
   return (
     <div
@@ -49,7 +58,7 @@ export default function DashboardViewer({
 
         <div className="flex items-center gap-1">
           <a
-            href={dashboard.path}
+            href={currentPath}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-text-secondary hover:text-accent hover:bg-surface rounded-md transition-colors no-underline"
@@ -71,6 +80,24 @@ export default function DashboardViewer({
         </div>
       </div>
 
+      {hasTabs && (
+        <div className="flex items-center gap-0.5 px-4 py-1.5 bg-white border-b border-border shrink-0">
+          {dashboard.tabs!.map((tab, idx) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(idx)}
+              className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                idx === activeTab
+                  ? "bg-accent text-white font-semibold"
+                  : "text-text-secondary hover:bg-surface"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 relative bg-surface">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
@@ -82,7 +109,7 @@ export default function DashboardViewer({
         )}
 
         <iframe
-          src={iframeSrc}
+          src={currentPath}
           className="w-full h-full border-0"
           onLoad={() => setLoading(false)}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"

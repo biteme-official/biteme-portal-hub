@@ -9,15 +9,19 @@
   ],
   "dashboards": [
     {
-      "slug": "jasamol-dashboard",
-      "name": "자사몰 대시보드",
-      "description": "바잇미 자사몰 실시간 매출/주문/상품 대시보드",
+      "slug": "realtime-channel-dashboard",
+      "name": "실시간 채널 대시보드",
+      "description": "자사몰·스마트스토어 실시간 매출/주문/유입 대시보드",
       "category": "d2c",
       "path": "https://biteme-jasamol-dashboard.vercel.app",
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["자사몰", "매출", "실시간"]
+      "tags": ["자사몰", "스마트스토어", "실시간"],
+      "tabs": [
+        { "id": "jasamol", "label": "자사몰", "path": "https://biteme-jasamol-dashboard.vercel.app" },
+        { "id": "smartstore", "label": "스마트스토어", "path": "https://biteme-smartstore-dashboard.vercel.app" }
+      ]
     },
     {
       "slug": "roi-dashboard",
