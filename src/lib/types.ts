@@ -5,12 +5,6 @@ export interface Category {
   order: number;
 }
 
-export interface DashboardTab {
-  id: string;
-  label: string;
-  path: string;
-}
-
 export interface Dashboard {
   slug: string;
   name: string;
@@ -21,7 +15,6 @@ export interface Dashboard {
   status: "active" | "archive";
   owner: string;
   tags: string[];
-  tabs?: DashboardTab[];
 }
 
 export interface DashboardConfig {

@@ -1,6 +1,6 @@
 {
   "categories": [
-    { "id": "d2c", "label": "바잇미 자사몰", "icon": "ShoppingBag", "order": 1 },
+    { "id": "d2c", "label": "실시간 채널 대시보드", "icon": "ShoppingBag", "order": 1 },
     { "id": "b2b", "label": "B2B", "icon": "Building2", "order": 2 },
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
     { "id": "sku-pricing", "label": "SKU/프라이싱", "icon": "Tag", "order": 4 },
@@ -9,19 +9,26 @@
   ],
   "dashboards": [
     {
-      "slug": "realtime-channel-dashboard",
-      "name": "실시간 채널 대시보드",
-      "description": "자사몰·스마트스토어 실시간 매출/주문/유입 대시보드",
+      "slug": "jasamol-dashboard",
+      "name": "바잇미 자사몰",
+      "description": "바잇미 자사몰 실시간 매출/주문/상품 대시보드",
       "category": "d2c",
       "path": "https://biteme-jasamol-dashboard.vercel.app",
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
-      "tags": ["자사몰", "스마트스토어", "실시간"],
-      "tabs": [
-        { "id": "jasamol", "label": "자사몰", "path": "https://biteme-jasamol-dashboard.vercel.app" },
-        { "id": "smartstore", "label": "스마트스토어", "path": "https://biteme-smartstore-dashboard.vercel.app" }
-      ]
+      "tags": ["자사몰", "매출", "실시간"]
+    },
+    {
+      "slug": "smartstore-dashboard",
+      "name": "스마트스토어",
+      "description": "바잇미 스마트스토어 매출/유입 분석 대시보드",
+      "category": "d2c",
+      "path": "https://biteme-smartstore-dashboard.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["스마트스토어", "매출", "실시간"]
     },
     {
       "slug": "roi-dashboard",
