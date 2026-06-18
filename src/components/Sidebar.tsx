@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Archive,
   Home,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -37,7 +38,7 @@ export default function Sidebar() {
 
   return (
     <aside className="w-60 bg-white border-r border-border flex flex-col shrink-0 overflow-y-auto">
-      <div className="p-3">
+      <div className="p-3 space-y-1">
         <Link
           href="/"
           className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
@@ -48,6 +49,17 @@ export default function Sidebar() {
         >
           <Home size={16} />
           <span>홈</span>
+        </Link>
+        <Link
+          href="/ai"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+            pathname === "/ai"
+              ? "bg-accent-light text-accent font-semibold"
+              : "text-text-secondary hover:bg-surface"
+          }`}
+        >
+          <Sparkles size={16} />
+          <span>AI 어시스턴트</span>
         </Link>
       </div>
 
