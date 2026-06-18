@@ -3,13 +3,35 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect, type FormEvent } from "react";
-import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Sparkles,
+  Database,
+  RefreshCw,
+} from "lucide-react";
 
 const transport = new DefaultChatTransport({ api: "/api/ai/chat" });
+
+interface SourceStatus {
+  lastUpdated: string;
+  recordCount: number;
+}
+
+type StatusMap = Record<string, SourceStatus | null>;
+
+const SOURCE_LABELS: Record<string, string> = {
+  product: "프로덕트",
+  smartstore: "스마트스토어",
+  b2b: "B2B",
+};
 
 export default function AiPage() {
   const { messages, sendMessage, status, error } = useChat({ transport });
   const [input, setInput] = useState("");
+  const [sourceStatus, setSourceStatus] = useState<StatusMap | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = status === "submitted" || status === "streaming";
@@ -23,6 +45,10 @@ export default function AiPage() {
 
   useEffect(() => {
     inputRef.current?.focus();
+    fetch("/api/knowledge/status")
+      .then((r) => r.json())
+      .then(setSourceStatus)
+      .catch(() => {});
   }, []);
 
   function submit(text: string) {
@@ -34,6 +60,29 @@ export default function AiPage() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     submit(input);
+  }
+
+  function refreshKnowledge() {
+    fetch("/api/knowledge/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sources: ["product"] }),
+    })
+      .then(() => fetch("/api/knowledge/status"))
+      .then((r) => r.json())
+      .then(setSourceStatus)
+      .catch(() => {});
+  }
+
+  function formatTime(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMin = Math.round((now.getTime() - d.getTime()) / 60000);
+    if (diffMin < 1) return "방금 전";
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}시간 전`;
+    return `${Math.round(diffHr / 24)}일 전`;
   }
 
   return (
@@ -48,11 +97,44 @@ export default function AiPage() {
               AI 어시스턴트
             </h1>
             <p className="text-[11px] text-text-secondary">
-              프로덕트 대시보드 데이터 기반 질의응답
+              멀티소스 데이터 기반 질의응답
             </p>
           </div>
         </div>
+        <button
+          onClick={refreshKnowledge}
+          className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent transition-colors px-2 py-1 rounded-md hover:bg-accent-light/30"
+          title="데이터 갱신"
+        >
+          <RefreshCw size={12} />
+          갱신
+        </button>
       </div>
+
+      {sourceStatus && (
+        <div className="flex items-center gap-3 px-5 py-2 bg-surface border-b border-border text-[11px] shrink-0">
+          <Database size={12} className="text-text-secondary shrink-0" />
+          {Object.entries(SOURCE_LABELS).map(([id, label]) => {
+            const s = sourceStatus[id];
+            return (
+              <span
+                key={id}
+                className={`flex items-center gap-1 ${s ? "text-text-secondary" : "text-text-secondary/40"}`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${s ? "bg-green-400" : "bg-gray-300"}`}
+                />
+                {label}
+                {s && (
+                  <span className="text-text-secondary/60">
+                    {formatTime(s.lastUpdated)}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
         {messages.length === 0 && (
@@ -64,15 +146,16 @@ export default function AiPage() {
               무엇이든 물어보세요
             </h2>
             <p className="text-sm text-text-secondary max-w-md mb-6">
-              프로덕트 대시보드의 SKU, 출시일, 프라이싱, 발주량 등에 대해
-              질문하면 실시간 데이터를 기반으로 답변합니다.
+              프로덕트, 스마트스토어, B2B 도매 데이터를 기반으로 답변합니다.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
               {[
                 "더블히트 패딩 출시일 확인해줘",
                 "프라이싱 미확정 SKU 목록 알려줘",
-                "의류 카테고리 총 발주량 합계는?",
-                "원가율 25% 이상인 SKU는?",
+                "스마트스토어 이번 달 매출 현황은?",
+                "B2B 상위 5개 거래처 매출은?",
+                "스마트스토어 vs B2B 매출 비교",
+                "전체 채널 종합 현황 요약",
               ].map((q) => (
                 <button
                   key={q}
@@ -109,7 +192,10 @@ export default function AiPage() {
                   dangerouslySetInnerHTML={{
                     __html: formatMarkdown(
                       m.parts
-                        ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+                        ?.filter(
+                          (p): p is { type: "text"; text: string } =>
+                            p.type === "text"
+                        )
                         .map((p) => p.text)
                         .join("") ?? ""
                     ),
@@ -117,7 +203,10 @@ export default function AiPage() {
                 />
               ) : (
                 m.parts
-                  ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+                  ?.filter(
+                    (p): p is { type: "text"; text: string } =>
+                      p.type === "text"
+                  )
                   .map((p) => p.text)
                   .join("") ?? ""
               )}
@@ -204,6 +293,11 @@ function formatMarkdown(text: string): string {
         .join("");
       return `<table class="border-collapse border border-border w-full my-2"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
     }
+  );
+
+  html = html.replace(
+    /\[(프로덕트 대시보드|스마트스토어|B2B 도매)\]/g,
+    '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-light text-accent">$1</span>'
   );
 
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
