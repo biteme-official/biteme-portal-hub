@@ -1,5 +1,5 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { streamText } from "ai";
+import { streamText, convertToModelMessages } from "ai";
 import { fetchProductData } from "@/lib/product-data";
 
 export async function POST(req: Request) {
@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   }
 
   const { messages } = await req.json();
+  const modelMessages = await convertToModelMessages(messages);
 
   let dataContext = "데이터를 불러올 수 없습니다.";
   try {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
 
 [프로덕트 대시보드 SKU 데이터]
 ${dataContext}`,
-    messages,
+    messages: modelMessages,
   });
 
   return result.toUIMessageStreamResponse();
