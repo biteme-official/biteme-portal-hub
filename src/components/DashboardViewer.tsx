@@ -94,7 +94,6 @@ export default function DashboardViewer({
           src={dashboard.path}
           className="w-full h-full border-0"
           onLoad={() => setLoading(false)}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />
       </div>
     </div>
