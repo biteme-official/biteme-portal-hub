@@ -14,6 +14,7 @@ export async function writeSummary(
   await put(path, JSON.stringify(summary), {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
   });
   cache.set(sourceId, { data: summary, fetchedAt: Date.now() });
