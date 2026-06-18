@@ -55,13 +55,15 @@ async function fetchWithRetry(
 async function fetchAllPages<T>(
   endpoint: string,
   dataKey: string,
-  token: string
+  token: string,
+  maxPages = 15
 ): Promise<T[]> {
   const all: T[] = [];
   let offset = 0;
   const limit = 100;
+  let page = 0;
 
-  while (true) {
+  while (page < maxPages) {
     const url = `${API_BASE}${endpoint}?limit=${limit}&offset=${offset}`;
     const res = await fetchWithRetry(url, token);
     if (!res.ok) throw new Error(`Bcart API ${res.status}: ${await res.text()}`);
@@ -73,6 +75,7 @@ async function fetchAllPages<T>(
     all.push(...items);
     if (items.length < limit) break;
     offset += limit;
+    page++;
   }
 
   return all;
@@ -81,15 +84,9 @@ async function fetchAllPages<T>(
 export async function collectAndSummarizeB2B(): Promise<DataSummary> {
   const token = getToken();
 
-  const [customers, orders, orderProducts] = await Promise.all([
-    fetchAllPages<BcartCustomer>("/customers", "customers", token),
-    fetchAllPages<BcartOrder>("/orders", "orders", token),
-    fetchAllPages<BcartOrderProduct>(
-      "/order_products",
-      "order_products",
-      token
-    ),
-  ]);
+  const customers = await fetchAllPages<BcartCustomer>("/customers", "customers", token, 5);
+  const orders = await fetchAllPages<BcartOrder>("/orders", "orders", token, 15);
+  const orderProducts = await fetchAllPages<BcartOrderProduct>("/order_products", "order_products", token, 15);
 
   return buildB2BSummary(customers, orders, orderProducts);
 }
