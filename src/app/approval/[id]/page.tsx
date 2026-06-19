@@ -14,10 +14,12 @@ import {
   Eye,
   Image,
   Link2,
+  UserRoundCog,
 } from "lucide-react";
 import StatusBadge from "@/components/approval/StatusBadge";
 import { StampLineDisplay } from "@/components/approval/StampLine";
 import CommentThread from "@/components/approval/CommentThread";
+import ItemDelegateModal from "@/components/approval/ItemDelegateModal";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ApprovalRequest } from "@/lib/types/approval";
 import { formatDistanceToNow } from "date-fns";
@@ -32,6 +34,7 @@ export default function ApprovalDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectComment, setRejectComment] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showDelegateModal, setShowDelegateModal] = useState(false);
 
   const fetchApproval = useCallback(async () => {
     const res = await fetch(`/api/approvals/${id}`);
@@ -110,23 +113,23 @@ export default function ApprovalDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-start gap-3 mb-6">
         <Link
           href="/approval"
-          className="p-1.5 rounded-lg hover:bg-surface text-text-secondary transition-colors"
+          className="p-1.5 rounded-lg hover:bg-surface text-text-secondary transition-colors mt-0.5"
         >
           <ArrowLeft size={18} />
         </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             {approval.isUrgent && (
               <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-bold rounded">
                 긴급
               </span>
             )}
-            <h1 className="text-xl font-bold text-text-primary">
+            <h1 className="text-lg md:text-xl font-bold text-text-primary break-words">
               {approval.title}
             </h1>
             <StatusBadge status={approval.status} />
@@ -142,7 +145,7 @@ export default function ApprovalDetailPage() {
       </div>
 
       {/* Stamp Line - 결재 도장 라인 (상단) */}
-      <div className="bg-white rounded-xl border border-border p-5 mb-6">
+      <div className="bg-white rounded-xl border border-border p-4 md:p-5 mb-6 overflow-x-auto">
         <StampLineDisplay
           requester={approval.requester}
           steps={approval.approvalLine}
@@ -254,7 +257,7 @@ export default function ApprovalDetailPage() {
         {(canApprove || canCancel || approval.status === "draft") && (
           <div className="bg-white rounded-xl border border-border p-5">
             {canApprove && !showRejectForm && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleApprove}
                   disabled={actionLoading}
@@ -274,6 +277,13 @@ export default function ApprovalDetailPage() {
                 >
                   <X size={14} />
                   반려
+                </button>
+                <button
+                  onClick={() => setShowDelegateModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm text-text-secondary hover:bg-surface transition-colors"
+                >
+                  <UserRoundCog size={14} />
+                  건별 위임
                 </button>
               </div>
             )}
@@ -339,7 +349,7 @@ export default function ApprovalDetailPage() {
         )}
 
         {/* Comments */}
-        <div className="bg-white rounded-xl border border-border p-5">
+        <div className="bg-white rounded-xl border border-border p-4 md:p-5">
           <CommentThread
             comments={approval.comments}
             approvalId={approval.id}
@@ -347,6 +357,17 @@ export default function ApprovalDetailPage() {
           />
         </div>
       </div>
+
+      {showDelegateModal && (
+        <ItemDelegateModal
+          approvalId={approval.id}
+          onClose={() => setShowDelegateModal(false)}
+          onDelegated={() => {
+            setShowDelegateModal(false);
+            fetchApproval();
+          }}
+        />
+      )}
     </div>
   );
 }

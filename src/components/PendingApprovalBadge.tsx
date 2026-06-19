@@ -78,7 +78,7 @@ export default function PendingApprovalBadge() {
 
       {/* Toast Notification */}
       {showToast && !toastDismissed && count > 0 && (
-        <div className="fixed top-16 right-5 z-[100] w-80 bg-white rounded-xl shadow-2xl border border-border overflow-hidden animate-in slide-in-from-top-2 duration-300">
+        <div className="fixed top-16 right-3 sm:right-5 z-[100] w-[calc(100vw-1.5rem)] sm:w-80 max-w-80 bg-white rounded-xl shadow-2xl border border-border overflow-hidden animate-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2 px-4 py-3 bg-accent/5 border-b border-border">
             <AlertTriangle size={16} className="text-accent shrink-0" />
             <span className="text-sm font-semibold text-text-primary flex-1">

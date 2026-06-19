@@ -20,6 +20,7 @@ function Stamp({
   status,
   date,
   comment,
+  delegatedFrom,
   onRemove,
   draggable,
   onDragStart,
@@ -33,6 +34,7 @@ function Stamp({
   status?: "waiting" | "current" | "approved" | "rejected" | "requester";
   date?: string | null;
   comment?: string | null;
+  delegatedFrom?: { uid: string; name: string } | null;
   onRemove?: () => void;
   draggable?: boolean;
   onDragStart?: () => void;
@@ -124,15 +126,21 @@ function Stamp({
         )}
       </div>
 
-      <div className="text-[9px] text-text-secondary bg-white/60 w-full text-center py-0.5 border-t border-inherit h-[18px] truncate px-1">
-        {date
-          ? new Date(date).toLocaleDateString("ko-KR", {
-              month: "2-digit",
-              day: "2-digit",
-            })
-          : status === "current"
-            ? "결재중"
-            : " "}
+      <div className="text-[9px] text-text-secondary bg-white/60 w-full text-center py-0.5 border-t border-inherit min-h-[18px] truncate px-1">
+        {delegatedFrom ? (
+          <span className="text-accent" title={`${delegatedFrom.name}님이 위임`}>
+            ← {delegatedFrom.name}
+          </span>
+        ) : date ? (
+          new Date(date).toLocaleDateString("ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+          })
+        ) : status === "current" ? (
+          "결재중"
+        ) : (
+          " "
+        )}
       </div>
     </div>
   );
@@ -252,7 +260,7 @@ export function StampLineEditor({
           </button>
 
           {showPicker && (
-            <div className="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-border overflow-hidden z-50 w-64">
+            <div className="absolute right-0 sm:left-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-border overflow-hidden z-50 w-64">
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
             <Search size={14} className="text-text-secondary shrink-0" />
             <input
@@ -348,6 +356,7 @@ export function StampLineDisplay({
           status={step.status}
           date={step.decidedAt}
           comment={step.comment}
+          delegatedFrom={step.delegatedFrom}
         />
       ))}
     </div>

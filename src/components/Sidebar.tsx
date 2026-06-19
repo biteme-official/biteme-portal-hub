@@ -15,6 +15,7 @@ import {
   Sparkles,
   ClipboardCheck,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -23,6 +24,7 @@ import {
   getArchivedDashboards,
 } from "@/lib/dashboards";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMobileSidebar } from "@/contexts/MobileSidebarContext";
 
 const iconMap: Record<string, LucideIcon> = {
   ShoppingBag,
@@ -37,26 +39,49 @@ const iconMap: Record<string, LucideIcon> = {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { isOpen, close } = useMobileSidebar();
   const categories = getCategories();
   const archived = getArchivedDashboards();
 
   return (
-    <aside className="w-60 bg-white border-r border-border flex flex-col shrink-0 overflow-y-auto">
-      <div className="p-3 space-y-1">
-        <Link
-          href="/"
-          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
-            pathname === "/"
-              ? "bg-accent-light text-accent font-semibold"
-              : "text-text-secondary hover:bg-surface"
-          }`}
-        >
-          <Home size={16} />
-          <span>홈</span>
-        </Link>
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={close}
+        />
+      )}
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-border flex flex-col z-50 overflow-y-auto transition-transform duration-200 md:static md:w-60 md:shrink-0 md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between p-3 md:hidden">
+          <span className="text-sm font-bold text-text-primary">메뉴</span>
+          <button
+            onClick={close}
+            className="p-1.5 rounded-lg hover:bg-surface text-text-secondary"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-3 space-y-1">
+          <Link
+            href="/"
+            onClick={close}
+            className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
+              pathname === "/"
+                ? "bg-accent-light text-accent font-semibold"
+                : "text-text-secondary hover:bg-surface"
+            }`}
+          >
+            <Home size={16} />
+            <span>홈</span>
+          </Link>
         <Link
           href="/ai"
-          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+          onClick={close}
+          className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
             pathname === "/ai"
               ? "bg-accent-light text-accent font-semibold"
               : "text-text-secondary hover:bg-surface"
@@ -67,7 +92,8 @@ export default function Sidebar() {
         </Link>
         <Link
           href="/approval"
-          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+          onClick={close}
+          className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
             pathname.startsWith("/approval")
               ? "bg-accent-light text-accent font-semibold"
               : "text-text-secondary hover:bg-surface"
@@ -79,7 +105,8 @@ export default function Sidebar() {
         {user?.role === "admin" && (
           <Link
             href="/admin/users"
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+            onClick={close}
+            className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
               pathname.startsWith("/admin")
                 ? "bg-accent-light text-accent font-semibold"
                 : "text-text-secondary hover:bg-surface"
@@ -121,7 +148,8 @@ export default function Sidebar() {
                     <Link
                       key={d.slug}
                       href={`/dashboard/${d.slug}`}
-                      className={`block px-3 py-1.5 ml-5 rounded-md text-sm no-underline transition-colors ${
+                      onClick={close}
+                      className={`block px-3 py-2 md:py-1.5 ml-5 rounded-md text-sm no-underline transition-colors ${
                         isActive
                           ? "bg-accent-light text-accent font-medium"
                           : "text-text-primary hover:bg-surface"
@@ -153,7 +181,8 @@ export default function Sidebar() {
                   <Link
                     key={d.slug}
                     href={`/dashboard/${d.slug}`}
-                    className={`block px-3 py-1.5 ml-5 rounded-md text-sm no-underline transition-colors opacity-60 ${
+                    onClick={close}
+                    className={`block px-3 py-2 md:py-1.5 ml-5 rounded-md text-sm no-underline transition-colors opacity-60 ${
                       isActive
                         ? "bg-accent-light text-accent font-medium opacity-100"
                         : "text-text-primary hover:bg-surface"
@@ -167,6 +196,7 @@ export default function Sidebar() {
           </>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

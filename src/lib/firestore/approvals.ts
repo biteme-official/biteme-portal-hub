@@ -217,8 +217,24 @@ export async function decideStep(
     const currentIdx = d.currentStep - 1;
     const currentStepData = d.approvalLine[currentIdx];
 
-    if (!currentStepData || currentStepData.approver.uid !== approverUid) {
+    let isDelegated = false;
+    if (!currentStepData) {
       throw new Error("현재 결재 순서가 아닙니다.");
+    }
+
+    if (currentStepData.approver.uid !== approverUid) {
+      const delegationDoc = await tx.get(
+        db.collection("delegations").doc(currentStepData.approver.uid)
+      );
+      if (
+        delegationDoc.exists &&
+        delegationDoc.data()?.delegateTo?.uid === approverUid &&
+        delegationDoc.data()?.isActive
+      ) {
+        isDelegated = true;
+      } else {
+        throw new Error("현재 결재 순서가 아닙니다.");
+      }
     }
 
     const updatedLine = [...d.approvalLine];
@@ -227,6 +243,7 @@ export async function decideStep(
       status: action === "approve" ? "approved" : "rejected",
       comment: comment || null,
       decidedAt: new Date().toISOString(),
+      ...(isDelegated ? { delegatedBy: approverUid } : {}),
     };
 
     if (action === "reject") {

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Search, X, LayoutDashboard } from "lucide-react";
+import { Search, X, LayoutDashboard, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { searchDashboards } from "@/lib/dashboards";
 import type { Dashboard } from "@/lib/types";
 import UserMenu from "./UserMenu";
 import PendingApprovalBadge from "./PendingApprovalBadge";
 import NotificationBell from "./NotificationBell";
+import { useMobileSidebar } from "@/contexts/MobileSidebarContext";
 
 export default function Header() {
   const [query, setQuery] = useState("");
@@ -15,6 +16,7 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { toggle } = useMobileSidebar();
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -50,17 +52,28 @@ export default function Header() {
   }
 
   return (
-    <header className="h-14 bg-navy flex items-center px-5 gap-4 shrink-0 z-50 relative">
+    <header className="h-14 bg-navy flex items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 z-50 relative">
+      <button
+        onClick={toggle}
+        className="md:hidden p-2 text-white/70 hover:text-white transition-colors"
+        aria-label="메뉴"
+      >
+        <Menu size={20} />
+      </button>
+
       <a href="/" className="flex items-center gap-2 text-white no-underline">
         <LayoutDashboard size={22} className="text-accent" />
-        <span className="font-bold text-[15px] tracking-tight">
+        <span className="font-bold text-[15px] tracking-tight hidden sm:inline">
           BiteMe 포털 허브
+        </span>
+        <span className="font-bold text-[15px] tracking-tight sm:hidden">
+          BiteMe
         </span>
       </a>
 
       <div className="flex-1" />
 
-      <div className="relative w-full max-w-sm">
+      <div className="relative w-full max-w-sm hidden sm:block">
         <div className="flex items-center bg-white/10 rounded-lg px-3 h-9 gap-2">
           <Search size={15} className="text-white/50" />
           <input

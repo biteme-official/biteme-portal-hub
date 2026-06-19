@@ -7,6 +7,7 @@ import Link from "next/link";
 import { StampLineEditor } from "@/components/approval/StampLine";
 import ApproverPicker from "@/components/approval/ApproverPicker";
 import FileUpload from "@/components/approval/FileUpload";
+import TemplatePicker from "@/components/approval/TemplatePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   APPROVAL_CATEGORIES,
@@ -93,7 +94,7 @@ export default function NewApprovalPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link
           href="/approval"
@@ -106,6 +107,19 @@ export default function NewApprovalPage() {
 
       <div className="bg-white rounded-xl border border-border p-6 space-y-5">
         {/* Stamp Line - 결재 도장 라인 */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+          <span className="text-sm font-medium text-text-primary">결재라인</span>
+          <TemplatePicker
+            approvers={approvers}
+            ccList={ccList}
+            category={category}
+            onLoad={(t) => {
+              setApprovers(t.approvers);
+              setCcList(t.ccList);
+              setCategory(t.category);
+            }}
+          />
+        </div>
         <StampLineEditor
           requester={{
             name: user?.name || "",

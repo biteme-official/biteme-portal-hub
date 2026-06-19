@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { Plus, Loader2, Inbox, Search } from "lucide-react";
+import { Plus, Loader2, Inbox, Search, CheckSquare } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ApprovalCard from "@/components/approval/ApprovalCard";
+import DelegationSetting from "@/components/approval/DelegationSetting";
 import type { ApprovalRequest, ApprovalStatus } from "@/lib/types/approval";
 import { STATUS_LABELS } from "@/lib/types/approval";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +46,8 @@ function ApprovalListContent() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const fetchApprovals = useCallback(async () => {
     setLoading(true);
@@ -106,6 +109,49 @@ function ApprovalListContent() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
+  const myPendingItems = user
+    ? filtered.filter((a) =>
+        a.approvalLine.some(
+          (s) => s.approver.uid === user.uid && s.status === "current"
+        )
+      )
+    : [];
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === myPendingItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(myPendingItems.map((a) => a.id)));
+    }
+  }
+
+  async function handleBatchApprove() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}건을 일괄 승인하시겠습니까?`)) return;
+    setBatchLoading(true);
+    const res = await fetch("/api/approvals/batch-decide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), action: "approve" }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      alert(`${data.succeeded}건 승인 완료${data.failed > 0 ? `, ${data.failed}건 실패` : ""}`);
+      setSelectedIds(new Set());
+      fetchApprovals();
+    }
+    setBatchLoading(false);
+  }
+
   const pendingCount = user
     ? approvals.filter((a) =>
         a.approvalLine.some(
@@ -115,21 +161,24 @@ function ApprovalListContent() {
     : 0;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-bold text-text-primary">전자결재</h1>
           <p className="text-sm text-text-secondary mt-1">
             업무 결재 요청 및 승인 관리
           </p>
         </div>
-        <Link
-          href="/approval/new"
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors no-underline"
-        >
-          <Plus size={16} />
-          새 결재 요청
-        </Link>
+        <div className="flex items-center gap-2">
+          <DelegationSetting />
+          <Link
+            href="/approval/new"
+            className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors no-underline"
+          >
+            <Plus size={16} />
+            새 결재 요청
+          </Link>
+        </div>
       </div>
 
       <div className="relative mb-4">
@@ -145,12 +194,12 @@ function ApprovalListContent() {
         />
       </div>
 
-      <div className="flex items-center gap-1 mb-4 border-b border-border">
+      <div className="flex items-center gap-1 mb-4 border-b border-border overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-3 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key
                 ? "border-accent text-accent"
                 : "border-transparent text-text-secondary hover:text-text-primary"
@@ -181,6 +230,35 @@ function ApprovalListContent() {
           ))}
         </select>
       </div>
+
+      {tab === "my-approvals" && myPendingItems.length > 0 && (
+        <div className="flex items-center gap-3 mb-4 px-3 py-2 bg-accent/5 border border-accent/20 rounded-lg">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80"
+          >
+            <CheckSquare size={14} />
+            {selectedIds.size === myPendingItems.length ? "전체 해제" : "전체 선택"}
+          </button>
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-xs text-text-secondary">
+                {selectedIds.size}건 선택
+              </span>
+              <button
+                onClick={handleBatchApprove}
+                disabled={batchLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {batchLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : null}
+                일괄 승인
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -223,10 +301,25 @@ function ApprovalListContent() {
                   {items.length}
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {items.map((a) => (
-                  <ApprovalCard key={a.id} approval={a} />
-                ))}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {items.map((a) => {
+                  const isMyTurn =
+                    tab === "my-approvals" &&
+                    user &&
+                    a.approvalLine.some(
+                      (s) =>
+                        s.approver.uid === user.uid && s.status === "current"
+                    );
+                  return (
+                    <ApprovalCard
+                      key={a.id}
+                      approval={a}
+                      selectable={!!isMyTurn}
+                      selected={selectedIds.has(a.id)}
+                      onToggle={() => toggleSelect(a.id)}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}

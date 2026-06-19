@@ -14,6 +14,7 @@ export type ApprovalCategory =
   | "제품/MD"
   | "구매/발주"
   | "운영/CS"
+  | "구매요청"
   | "기타";
 
 export interface UserRef {
@@ -30,6 +31,8 @@ export interface ApprovalStep {
   status: StepStatus;
   comment: string | null;
   decidedAt: string | null;
+  delegatedFrom?: { uid: string; name: string };
+  delegatedBy?: string;
 }
 
 export interface Attachment {
@@ -81,6 +84,7 @@ export const APPROVAL_CATEGORIES: ApprovalCategory[] = [
   "마케팅/프로모션",
   "제품/MD",
   "구매/발주",
+  "구매요청",
   "운영/CS",
   "기타",
 ];
