@@ -16,6 +16,8 @@ export interface Dashboard {
   owner: string;
   tags: string[];
   github?: string;
+  roles?: string[];
+  roleLabels?: Record<string, string>;
 }
 
 export interface DashboardConfig {

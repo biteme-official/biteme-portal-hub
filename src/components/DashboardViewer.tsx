@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ExternalLink,
   GitBranch,
@@ -8,6 +8,7 @@ import {
   Minimize2,
   ChevronRight,
   Loader2,
+  ShieldX,
 } from "lucide-react";
 import Link from "next/link";
 import type { Dashboard } from "@/lib/types";
@@ -20,8 +21,36 @@ export default function DashboardViewer({
 }) {
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const categories = getCategories();
   const cat = categories.find((c) => c.id === dashboard.category);
+
+  useEffect(() => {
+    fetch("/api/auth/iframe-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: dashboard.slug }),
+    })
+      .then((r) => {
+        if (r.status === 403) {
+          setAccessDenied(true);
+          setLoading(false);
+          return null;
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (data?.token) {
+          const url = new URL(dashboard.path);
+          url.searchParams.set("portal_token", data.token);
+          setIframeSrc(url.toString());
+        }
+      })
+      .catch(() => {
+        setIframeSrc(dashboard.path);
+      });
+  }, [dashboard.slug, dashboard.path]);
 
   return (
     <div
@@ -81,20 +110,47 @@ export default function DashboardViewer({
       </div>
 
       <div className="flex-1 relative bg-surface">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 size={28} className="text-accent animate-spin" />
-              <span className="text-sm text-text-secondary">로딩 중...</span>
+        {accessDenied ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-white">
+            <div className="flex flex-col items-center gap-3 text-center px-6">
+              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                <ShieldX size={28} className="text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary">
+                접근 권한이 없습니다
+              </h3>
+              <p className="text-sm text-text-secondary max-w-sm">
+                이 대시보드에 대한 접근 권한이 설정되지 않았습니다.
+                관리자에게 권한을 요청하세요.
+              </p>
+              <Link
+                href="/"
+                className="mt-2 px-4 py-2 bg-accent text-white text-sm rounded-lg hover:bg-accent/90 no-underline"
+              >
+                홈으로 돌아가기
+              </Link>
             </div>
           </div>
-        )}
+        ) : (
+          <>
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 size={28} className="text-accent animate-spin" />
+                  <span className="text-sm text-text-secondary">로딩 중...</span>
+                </div>
+              </div>
+            )}
 
-        <iframe
-          src={dashboard.path}
-          className="w-full h-full border-0"
-          onLoad={() => setLoading(false)}
-        />
+            {iframeSrc && (
+              <iframe
+                src={iframeSrc}
+                className="w-full h-full border-0"
+                onLoad={() => setLoading(false)}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );

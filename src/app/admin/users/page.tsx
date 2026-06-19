@@ -16,7 +16,9 @@ import {
   Building2,
   Users,
   Pencil,
+  LayoutDashboard,
 } from "lucide-react";
+import { getDashboards } from "@/lib/dashboards";
 
 interface User {
   uid: string;
@@ -27,6 +29,7 @@ interface User {
   position: string;
   role: "admin" | "member";
   isActive: boolean;
+  dashboardAccess: Record<string, string>;
   createdAt: string | null;
   lastLoginAt: string | null;
 }
@@ -463,8 +466,12 @@ function UserFormModal({
   const [department, setDepartment] = useState(user?.department || "");
   const [position, setPosition] = useState(user?.position || "");
   const [role, setRole] = useState<"member" | "admin">(user?.role || "member");
+  const [dashboardAccess, setDashboardAccess] = useState<Record<string, string>>(
+    user?.dashboardAccess || {}
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const allDashboards = getDashboards();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -481,6 +488,7 @@ function UserFormModal({
           department,
           position,
           role,
+          dashboardAccess,
         }),
       });
       if (res.ok) {
@@ -594,6 +602,105 @@ function UserFormModal({
               <option value="member">멤버</option>
               <option value="admin">관리자</option>
             </select>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-sm font-medium text-text-primary mb-2">
+              <LayoutDashboard size={14} />
+              대시보드 접근 권한
+            </label>
+            <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2.5">
+              {allDashboards.map((d) => {
+                const hasRoles = d.roles && d.roles.length > 0;
+                const currentRole = dashboardAccess[d.slug] || "";
+
+                return (
+                  <div
+                    key={d.slug}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface"
+                  >
+                    {hasRoles ? (
+                      <>
+                        <select
+                          value={currentRole}
+                          onChange={(e) => {
+                            setDashboardAccess((prev) => {
+                              const next = { ...prev };
+                              if (e.target.value) {
+                                next[d.slug] = e.target.value;
+                              } else {
+                                delete next[d.slug];
+                              }
+                              return next;
+                            });
+                          }}
+                          className="h-7 px-2 rounded border border-border bg-surface text-xs focus:outline-none focus:border-accent min-w-[80px]"
+                        >
+                          <option value="">접근 불가</option>
+                          {d.roles!.map((r) => (
+                            <option key={r} value={r}>
+                              {d.roleLabels?.[r] || r}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-text-primary flex-1">
+                          {d.name}
+                        </span>
+                        {currentRole && (
+                          <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                            {d.roleLabels?.[currentRole] || currentRole}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="checkbox"
+                          checked={!!currentRole}
+                          onChange={() => {
+                            setDashboardAccess((prev) => {
+                              const next = { ...prev };
+                              if (next[d.slug]) {
+                                delete next[d.slug];
+                              } else {
+                                next[d.slug] = "viewer";
+                              }
+                              return next;
+                            });
+                          }}
+                          className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent"
+                        />
+                        <span className="text-sm text-text-primary flex-1">
+                          {d.name}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex gap-2 mt-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const all: Record<string, string> = {};
+                  for (const d of allDashboards) {
+                    all[d.slug] = d.roles?.[0] || "viewer";
+                  }
+                  setDashboardAccess(all);
+                }}
+                className="text-xs text-accent hover:text-accent/80"
+              >
+                전체 선택
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardAccess({})}
+                className="text-xs text-text-secondary hover:text-text-primary"
+              >
+                전체 해제
+              </button>
+            </div>
           </div>
 
           {error && (

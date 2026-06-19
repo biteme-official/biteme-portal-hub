@@ -42,7 +42,17 @@
       "status": "active",
       "owner": "전략기획팀",
       "tags": ["프로덕트", "현황"],
-      "github": "https://github.com/biteme-official/product-dashboard"
+      "github": "https://github.com/biteme-official/product-dashboard",
+      "roles": ["master", "pm", "marketing", "platform_md", "brand_md", "global", "cs"],
+      "roleLabels": {
+        "master": "마스터",
+        "pm": "PM",
+        "marketing": "마케팅",
+        "platform_md": "플랫폼 MD",
+        "brand_md": "브랜드 MD",
+        "global": "글로벌",
+        "cs": "CS"
+      }
     },
     {
       "slug": "roi-dashboard",
