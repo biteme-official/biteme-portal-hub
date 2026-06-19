@@ -471,7 +471,7 @@ function UserFormModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const allDashboards = getDashboards();
+  const roleDashboards = getDashboards().filter((d) => d.roles && d.roles.length > 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -604,14 +604,13 @@ function UserFormModal({
             </select>
           </div>
 
-          <div>
+          {roleDashboards.length > 0 && <div>
             <label className="flex items-center gap-1.5 text-sm font-medium text-text-primary mb-2">
               <LayoutDashboard size={14} />
               대시보드 접근 권한
             </label>
             <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2.5">
-              {allDashboards.map((d) => {
-                const hasRoles = d.roles && d.roles.length > 0;
+              {roleDashboards.map((d) => {
                 const currentRole = dashboardAccess[d.slug] || "";
 
                 return (
@@ -619,61 +618,35 @@ function UserFormModal({
                     key={d.slug}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface"
                   >
-                    {hasRoles ? (
-                      <>
-                        <select
-                          value={currentRole}
-                          onChange={(e) => {
-                            setDashboardAccess((prev) => {
-                              const next = { ...prev };
-                              if (e.target.value) {
-                                next[d.slug] = e.target.value;
-                              } else {
-                                delete next[d.slug];
-                              }
-                              return next;
-                            });
-                          }}
-                          className="h-7 px-2 rounded border border-border bg-surface text-xs focus:outline-none focus:border-accent min-w-[80px]"
-                        >
-                          <option value="">접근 불가</option>
-                          {d.roles!.map((r) => (
-                            <option key={r} value={r}>
-                              {d.roleLabels?.[r] || r}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-sm text-text-primary flex-1">
-                          {d.name}
-                        </span>
-                        {currentRole && (
-                          <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                            {d.roleLabels?.[currentRole] || currentRole}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="checkbox"
-                          checked={!!currentRole}
-                          onChange={() => {
-                            setDashboardAccess((prev) => {
-                              const next = { ...prev };
-                              if (next[d.slug]) {
-                                delete next[d.slug];
-                              } else {
-                                next[d.slug] = "viewer";
-                              }
-                              return next;
-                            });
-                          }}
-                          className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent"
-                        />
-                        <span className="text-sm text-text-primary flex-1">
-                          {d.name}
-                        </span>
-                      </>
+                    <select
+                      value={currentRole}
+                      onChange={(e) => {
+                        setDashboardAccess((prev) => {
+                          const next = { ...prev };
+                          if (e.target.value) {
+                            next[d.slug] = e.target.value;
+                          } else {
+                            delete next[d.slug];
+                          }
+                          return next;
+                        });
+                      }}
+                      className="h-7 px-2 rounded border border-border bg-surface text-xs focus:outline-none focus:border-accent min-w-[80px]"
+                    >
+                      <option value="">접근 불가</option>
+                      {d.roles!.map((r) => (
+                        <option key={r} value={r}>
+                          {d.roleLabels?.[r] || r}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-text-primary flex-1">
+                      {d.name}
+                    </span>
+                    {currentRole && (
+                      <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                        {d.roleLabels?.[currentRole] || currentRole}
+                      </span>
                     )}
                   </div>
                 );
@@ -684,8 +657,8 @@ function UserFormModal({
                 type="button"
                 onClick={() => {
                   const all: Record<string, string> = {};
-                  for (const d of allDashboards) {
-                    all[d.slug] = d.roles?.[0] || "viewer";
+                  for (const d of roleDashboards) {
+                    all[d.slug] = d.roles![0];
                   }
                   setDashboardAccess(all);
                 }}
@@ -701,7 +674,7 @@ function UserFormModal({
                 전체 해제
               </button>
             </div>
-          </div>
+          </div>}
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">

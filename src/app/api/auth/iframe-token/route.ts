@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { getDashboardBySlug } from "@/lib/dashboards";
 import { SignJWT } from "jose";
 
 const SECRET_KEY = process.env.SESSION_SECRET!;
@@ -14,6 +15,9 @@ export async function POST(request: Request) {
   if (!slug)
     return Response.json({ error: "slug is required" }, { status: 400 });
 
+  const dashboard = getDashboardBySlug(slug);
+  const hasRoles = dashboard?.roles && dashboard.roles.length > 0;
+
   const db = getAdminDb();
   const userDoc = await db.collection("users").doc(session.uid).get();
   const userData = userDoc.data();
@@ -21,7 +25,7 @@ export async function POST(request: Request) {
 
   const dashboardRole = access[slug];
 
-  if (userData?.role !== "admin" && !dashboardRole) {
+  if (hasRoles && userData?.role !== "admin" && !dashboardRole) {
     return Response.json(
       { error: "해당 대시보드에 접근 권한이 없습니다." },
       { status: 403 }
@@ -33,7 +37,7 @@ export async function POST(request: Request) {
     email: session.email,
     name: session.name,
     slug,
-    dashboardRole: dashboardRole || "admin",
+    dashboardRole: dashboardRole || (hasRoles ? "admin" : "viewer"),
     type: "iframe",
   })
     .setProtectedHeader({ alg: "HS256" })
