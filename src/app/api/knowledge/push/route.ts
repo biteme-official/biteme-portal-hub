@@ -1,7 +1,7 @@
 import { writeSummary } from "@/lib/knowledge-store";
 import type { SourceId, DataSummary } from "@/lib/data-sources/types";
 
-const VALID_SOURCES: SourceId[] = ["product", "smartstore", "b2b"];
+const VALID_SOURCES: SourceId[] = ["product", "smartstore"];
 
 export async function POST(req: Request) {
   const secret = process.env.KNOWLEDGE_PUSH_SECRET;

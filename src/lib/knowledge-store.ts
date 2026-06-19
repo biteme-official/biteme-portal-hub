@@ -47,7 +47,7 @@ export async function readSummary(
 export async function readAllSummaries(): Promise<
   Partial<Record<SourceId, DataSummary>>
 > {
-  const sources: SourceId[] = ["product", "smartstore", "b2b"];
+  const sources: SourceId[] = ["product", "smartstore"];
   const results: Partial<Record<SourceId, DataSummary>> = {};
 
   await Promise.all(
@@ -63,11 +63,11 @@ export async function readAllSummaries(): Promise<
 export async function getStoreStatus(): Promise<
   Record<SourceId, { lastUpdated: string; recordCount: number } | null>
 > {
-  const sources: SourceId[] = ["product", "smartstore", "b2b"];
+  const sources: SourceId[] = ["product", "smartstore"];
   const status: Record<
     SourceId,
     { lastUpdated: string; recordCount: number } | null
-  > = { product: null, smartstore: null, b2b: null };
+  > = { product: null, smartstore: null };
 
   await Promise.all(
     sources.map(async (id) => {

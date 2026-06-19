@@ -1,4 +1,4 @@
-export type SourceId = "product" | "smartstore" | "b2b";
+export type SourceId = "product" | "smartstore";
 
 export interface SourceMeta {
   sourceId: SourceId;
@@ -19,5 +19,4 @@ export interface DataSummary {
 export const SOURCE_LABELS: Record<SourceId, string> = {
   product: "프로덕트 대시보드",
   smartstore: "스마트스토어",
-  b2b: "B2B 도매",
 };

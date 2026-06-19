@@ -2,7 +2,8 @@ import type { DataSummary, SourceId } from "./data-sources/types";
 
 export function buildSystemPrompt(
   summaries: Partial<Record<SourceId, DataSummary>>,
-  selectedSources: SourceId[]
+  selectedSources: SourceId[],
+  approvalContext?: string
 ): string {
   const sourceBlocks: string[] = [];
 
@@ -43,8 +44,8 @@ export function buildSystemPrompt(
 - 데이터에 없는 정보는 "해당 데이터가 없습니다"라고 답변
 - 표 형태가 적절하면 마크다운 표 사용
 - 금액은 천 단위 쉼표 포함
-- 답변에 사용한 데이터의 출처를 명시하세요 (예: [프로덕트 대시보드], [스마트스토어], [B2B 도매])
+- 답변에 사용한 데이터의 출처를 명시하세요 (예: [프로덕트 대시보드], [스마트스토어], [전자결재])
 - 데이터의 기준 시점(마지막 업데이트)을 언급하세요
 - 여러 소스를 비교할 때는 비교 표를 사용하세요
-${sourceBlocks.join("\n")}`;
+${sourceBlocks.join("\n")}${approvalContext || ""}`;
 }

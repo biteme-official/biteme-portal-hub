@@ -25,7 +25,6 @@ type StatusMap = Record<string, SourceStatus | null>;
 const SOURCE_LABELS: Record<string, string> = {
   product: "프로덕트",
   smartstore: "스마트스토어",
-  b2b: "B2B",
 };
 
 export default function AiPage() {
@@ -146,16 +145,16 @@ export default function AiPage() {
               무엇이든 물어보세요
             </h2>
             <p className="text-sm text-text-secondary max-w-md mb-6">
-              프로덕트, 스마트스토어, B2B 도매 데이터를 기반으로 답변합니다.
+              프로덕트, 스마트스토어, 전자결재 데이터를 기반으로 답변합니다.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full">
               {[
                 "더블히트 패딩 출시일 확인해줘",
                 "프라이싱 미확정 SKU 목록 알려줘",
                 "스마트스토어 이번 달 매출 현황은?",
-                "B2B 상위 5개 거래처 매출은?",
-                "스마트스토어 vs B2B 매출 비교",
-                "전체 채널 종합 현황 요약",
+                "이번 주 주문건수 알려줘",
+                "내가 결재할 문서 있어?",
+                "긴급 결재 현황 알려줘",
               ].map((q) => (
                 <button
                   key={q}
@@ -296,7 +295,7 @@ function formatMarkdown(text: string): string {
   );
 
   html = html.replace(
-    /\[(프로덕트 대시보드|스마트스토어|B2B 도매)\]/g,
+    /\[(프로덕트 대시보드|스마트스토어|전자결재)\]/g,
     '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-light text-accent">$1</span>'
   );
 

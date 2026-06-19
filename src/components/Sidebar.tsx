@@ -13,6 +13,8 @@ import {
   Archive,
   Home,
   Sparkles,
+  ClipboardCheck,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -20,6 +22,7 @@ import {
   getDashboardsByCategory,
   getArchivedDashboards,
 } from "@/lib/dashboards";
+import { useAuth } from "@/contexts/AuthContext";
 
 const iconMap: Record<string, LucideIcon> = {
   ShoppingBag,
@@ -33,6 +36,7 @@ const iconMap: Record<string, LucideIcon> = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const categories = getCategories();
   const archived = getArchivedDashboards();
 
@@ -61,6 +65,30 @@ export default function Sidebar() {
           <Sparkles size={16} />
           <span>AI 어시스턴트</span>
         </Link>
+        <Link
+          href="/approval"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+            pathname.startsWith("/approval")
+              ? "bg-accent-light text-accent font-semibold"
+              : "text-text-secondary hover:bg-surface"
+          }`}
+        >
+          <ClipboardCheck size={16} />
+          <span>전자결재</span>
+        </Link>
+        {user?.role === "admin" && (
+          <Link
+            href="/admin/users"
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm no-underline transition-colors ${
+              pathname.startsWith("/admin")
+                ? "bg-accent-light text-accent font-semibold"
+                : "text-text-secondary hover:bg-surface"
+            }`}
+          >
+            <Users size={16} />
+            <span>사용자 관리</span>
+          </Link>
+        )}
       </div>
 
       <div className="flex-1 px-3 pb-3">

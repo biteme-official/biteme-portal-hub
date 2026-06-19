@@ -6,7 +6,7 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const sources: SourceId[] = body.sources || ["product", "b2b"];
+  const sources: SourceId[] = body.sources || ["product", "smartstore"];
   const results: Record<string, { ok: boolean; error?: string }> = {};
 
   if (sources.includes("product")) {
@@ -16,22 +16,6 @@ export async function POST(req: Request) {
       results.product = { ok: true };
     } catch (e) {
       results.product = {
-        ok: false,
-        error: e instanceof Error ? e.message : String(e),
-      };
-    }
-  }
-
-  if (sources.includes("b2b")) {
-    try {
-      const { collectAndSummarizeB2B } = await import(
-        "@/lib/data-sources/b2b-collector"
-      );
-      const summary = await collectAndSummarizeB2B();
-      await writeSummary("b2b", summary);
-      results.b2b = { ok: true };
-    } catch (e) {
-      results.b2b = {
         ok: false,
         error: e instanceof Error ? e.message : String(e),
       };

@@ -1,10 +1,12 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, convertToModelMessages } from "ai";
 import { readAllSummaries } from "@/lib/knowledge-store";
-import { routeSources } from "@/lib/source-router";
+import { routeSources, needsApprovalContext } from "@/lib/source-router";
 import { buildSystemPrompt } from "@/lib/prompt-builder";
 import { collectAndSummarizeProduct } from "@/lib/data-sources/product-collector";
 import { writeSummary } from "@/lib/knowledge-store";
+import { buildApprovalContext } from "@/lib/data-sources/approval-context";
+import { getSession } from "@/lib/auth/session";
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -42,7 +44,21 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemPrompt = buildSystemPrompt(summaries, selectedSources);
+  let approvalContext: string | undefined;
+  if (needsApprovalContext(userText)) {
+    try {
+      const session = await getSession();
+      approvalContext = await buildApprovalContext(session?.uid);
+    } catch (e) {
+      console.error("Approval context error:", e);
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(
+    summaries,
+    selectedSources,
+    approvalContext
+  );
 
   const result = streamText({
     model: anthropic("claude-sonnet-4-6"),

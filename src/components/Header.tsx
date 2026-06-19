@@ -5,6 +5,9 @@ import { Search, X, LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { searchDashboards } from "@/lib/dashboards";
 import type { Dashboard } from "@/lib/types";
+import UserMenu from "./UserMenu";
+import PendingApprovalBadge from "./PendingApprovalBadge";
+import NotificationBell from "./NotificationBell";
 
 export default function Header() {
   const [query, setQuery] = useState("");
@@ -101,6 +104,10 @@ export default function Header() {
           </div>
         )}
       </div>
+
+      <PendingApprovalBadge />
+      <NotificationBell />
+      <UserMenu />
     </header>
   );
 }
