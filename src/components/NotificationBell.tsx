@@ -19,7 +19,14 @@ const TYPE_ICON_COLOR: Record<NotificationType, string> = {
   approval_canceled: "bg-gray-100 text-gray-500",
   approval_comment: "bg-blue-100 text-blue-600",
   approval_reminder: "bg-yellow-100 text-yellow-600",
+  user_registered: "bg-purple-100 text-purple-600",
 };
+
+function getNotificationHref(n: Notification): string {
+  if (n.linkUrl) return n.linkUrl;
+  if (n.approvalId) return `/approval/${n.approvalId}`;
+  return "/notifications";
+}
 
 export default function NotificationBell() {
   const { user, loading } = useAuth();
@@ -120,7 +127,7 @@ export default function NotificationBell() {
               notifications.slice(0, 20).map((n) => (
                 <Link
                   key={n.id}
-                  href={`/approval/${n.approvalId}`}
+                  href={getNotificationHref(n)}
                   onClick={() => {
                     if (!n.isRead) markAsRead([n.id]);
                     setOpen(false);

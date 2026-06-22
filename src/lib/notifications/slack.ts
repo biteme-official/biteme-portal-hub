@@ -13,6 +13,7 @@ const TYPE_EMOJI: Record<NotificationType, string> = {
   approval_canceled: "🚫",
   approval_comment: "💬",
   approval_reminder: "⏰",
+  user_registered: "👤",
 };
 
 const TYPE_COLOR: Record<NotificationType, string> = {
@@ -22,6 +23,7 @@ const TYPE_COLOR: Record<NotificationType, string> = {
   approval_canceled: "#6b7280",
   approval_comment: "#3b82f6",
   approval_reminder: "#f59e0b",
+  user_registered: "#8b5cf6",
 };
 
 async function slackApi(method: string, body: Record<string, unknown>) {
@@ -84,10 +86,9 @@ function buildBlocks(
   type: NotificationType,
   title: string,
   body: string,
-  approvalId: string
+  linkUrl: string
 ) {
   const emoji = TYPE_EMOJI[type];
-  const link = `${PORTAL_URL}/approval/${approvalId}`;
 
   return [
     {
@@ -103,7 +104,7 @@ function buildBlocks(
         {
           type: "button",
           text: { type: "plain_text", text: "포털에서 확인" },
-          url: link,
+          url: linkUrl,
           style: "primary",
         },
       ],
@@ -116,19 +117,20 @@ interface SlackDmParams {
   type: NotificationType;
   title: string;
   body: string;
-  approvalId: string;
+  approvalId?: string;
+  linkUrl?: string;
 }
 
 export async function sendSlackDm(params: SlackDmParams) {
   if (!BOT_TOKEN) return;
 
   const color = TYPE_COLOR[params.type];
-  const blocks = buildBlocks(
-    params.type,
-    params.title,
-    params.body,
-    params.approvalId
-  );
+  const link = params.linkUrl
+    ? `${PORTAL_URL}${params.linkUrl}`
+    : params.approvalId
+      ? `${PORTAL_URL}/approval/${params.approvalId}`
+      : PORTAL_URL;
+  const blocks = buildBlocks(params.type, params.title, params.body, link);
 
   const results = await Promise.allSettled(
     params.recipientEmails.map(async (email) => {

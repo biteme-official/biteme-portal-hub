@@ -23,8 +23,9 @@ export async function GET() {
       type: d.type,
       title: d.title,
       body: d.body,
-      approvalId: d.approvalId,
-      approvalTitle: d.approvalTitle,
+      approvalId: d.approvalId || "",
+      approvalTitle: d.approvalTitle || "",
+      linkUrl: d.linkUrl || "",
       isRead: d.isRead || false,
       createdAt: d.createdAt?.toDate?.()?.toISOString() || "",
     };

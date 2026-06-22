@@ -9,8 +9,9 @@ interface NotifyParams {
   type: NotificationType;
   title: string;
   body: string;
-  approvalId: string;
-  approvalTitle: string;
+  approvalId?: string;
+  approvalTitle?: string;
+  linkUrl?: string;
 }
 
 async function getEmailsByUids(uids: string[]): Promise<string[]> {
@@ -32,16 +33,18 @@ export async function dispatchNotification(params: NotifyParams) {
 
   for (const uid of params.recipientUids) {
     const docRef = db.collection("notifications").doc();
-    batch.set(docRef, {
+    const doc: Record<string, unknown> = {
       recipientUid: uid,
       type: params.type,
       title: params.title,
       body: params.body,
-      approvalId: params.approvalId,
-      approvalTitle: params.approvalTitle,
       isRead: false,
       createdAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (params.approvalId) doc.approvalId = params.approvalId;
+    if (params.approvalTitle) doc.approvalTitle = params.approvalTitle;
+    if (params.linkUrl) doc.linkUrl = params.linkUrl;
+    batch.set(docRef, doc);
   }
 
   await batch.commit();
@@ -54,6 +57,7 @@ export async function dispatchNotification(params: NotifyParams) {
         title: params.title,
         body: params.body,
         approvalId: params.approvalId,
+        linkUrl: params.linkUrl,
       })
     )
     .catch((e) => console.error("Slack DM error:", e));
@@ -127,5 +131,28 @@ export async function notifyComment(
     body: `${authorName}님이 "${approvalTitle}"에 코멘트를 남겼습니다.`,
     approvalId,
     approvalTitle,
+  });
+}
+
+export async function notifyNewUserRegistered(
+  userName: string,
+  userEmail: string
+) {
+  const db = getAdminDb();
+  const adminsSnap = await db
+    .collection("users")
+    .where("role", "==", "admin")
+    .where("isActive", "==", true)
+    .get();
+
+  const adminUids = adminsSnap.docs.map((doc) => doc.id);
+  if (adminUids.length === 0) return;
+
+  await dispatchNotification({
+    recipientUids: adminUids,
+    type: "user_registered",
+    title: "신규 사용자 가입",
+    body: `${userName}(${userEmail})님이 포털에 가입했습니다. 사용자 관리에서 승인해주세요.`,
+    linkUrl: "/admin/users",
   });
 }

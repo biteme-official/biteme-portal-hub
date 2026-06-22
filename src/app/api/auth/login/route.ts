@@ -2,6 +2,7 @@ import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { createSessionToken } from "@/lib/auth/session";
 import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
+import { notifyNewUserRegistered } from "@/lib/notifications/send";
 
 const COOKIE_NAME = "session";
 
@@ -50,10 +51,11 @@ export async function POST(request: Request) {
       } else {
         const usersSnapshot = await adminDb.collection("users").limit(1).get();
         const isFirstUser = usersSnapshot.empty;
+        const newUserName = decoded.name || decoded.email!.split("@")[0];
         await userRef.set({
           uid: decoded.uid,
           email: decoded.email!,
-          name: decoded.name || decoded.email!.split("@")[0],
+          name: newUserName,
           photoURL: decoded.picture || null,
           division: "",
           department: "",
@@ -65,6 +67,12 @@ export async function POST(request: Request) {
           lastLoginAt: null,
         });
         userDoc = await userRef.get();
+
+        if (!isFirstUser) {
+          notifyNewUserRegistered(newUserName, decoded.email!).catch((e) =>
+            console.error("New user notification error:", e)
+          );
+        }
       }
     }
 
