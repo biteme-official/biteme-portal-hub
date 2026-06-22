@@ -49,27 +49,21 @@ export async function POST(request: Request) {
         userDoc = await userRef.get();
       } else {
         const usersSnapshot = await adminDb.collection("users").limit(1).get();
-        if (usersSnapshot.empty) {
-          await userRef.set({
-            uid: decoded.uid,
-            email: decoded.email,
-            name: decoded.name || decoded.email.split("@")[0],
-            photoURL: decoded.picture || null,
-            division: "",
-            department: "",
-            position: "",
-            role: "admin",
-            isActive: true,
-            createdAt: FieldValue.serverTimestamp(),
-            lastLoginAt: FieldValue.serverTimestamp(),
-          });
-          userDoc = await userRef.get();
-        } else {
-          return Response.json(
-            { error: "등록되지 않은 사용자입니다. 관리자에게 등록을 요청하세요." },
-            { status: 403 }
-          );
-        }
+        await userRef.set({
+          uid: decoded.uid,
+          email: decoded.email!,
+          name: decoded.name || decoded.email!.split("@")[0],
+          photoURL: decoded.picture || null,
+          division: "",
+          department: "",
+          position: "",
+          role: usersSnapshot.empty ? "admin" : "member",
+          isActive: true,
+          dashboardAccess: {},
+          createdAt: FieldValue.serverTimestamp(),
+          lastLoginAt: FieldValue.serverTimestamp(),
+        });
+        userDoc = await userRef.get();
       }
     }
 
