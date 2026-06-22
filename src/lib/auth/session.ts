@@ -51,6 +51,12 @@ export async function createSession(user: Omit<SessionPayload, "expiresAt">) {
   });
 }
 
+export async function createSessionToken(user: Omit<SessionPayload, "expiresAt">) {
+  const expiresAt = Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  const token = await encrypt({ ...user, expiresAt });
+  return { token, expiresAt };
+}
+
 export async function deleteSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);

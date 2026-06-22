@@ -1,6 +1,9 @@
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
-import { createSession } from "@/lib/auth/session";
+import { createSessionToken } from "@/lib/auth/session";
 import { FieldValue } from "firebase-admin/firestore";
+import { NextResponse } from "next/server";
+
+const COOKIE_NAME = "session";
 
 export async function POST(request: Request) {
   try {
@@ -25,8 +28,6 @@ export async function POST(request: Request) {
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      // 등록되지 않은 사용자 → 관리자 승인 필요
-      // 단, users 컬렉션이 비어있으면(최초 사용자) 자동으로 admin 등록
       const usersSnapshot = await adminDb.collection("users").limit(1).get();
       if (usersSnapshot.empty) {
         await userRef.set({
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
     await userRef.update({ lastLoginAt: FieldValue.serverTimestamp() });
 
-    await createSession({
+    const { token, expiresAt } = await createSessionToken({
       uid: decoded.uid,
       email: decoded.email!,
       name: decoded.name || decoded.email!.split("@")[0],
@@ -69,12 +70,22 @@ export async function POST(request: Request) {
       role: (userData.role as "admin" | "member") || "member",
     });
 
-    return Response.json({
+    const response = NextResponse.json({
       uid: decoded.uid,
       email: decoded.email,
       name: decoded.name || decoded.email!.split("@")[0],
       photoURL: decoded.picture || null,
     });
+
+    response.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(expiresAt),
+    });
+
+    return response;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Login error:", message, err);
