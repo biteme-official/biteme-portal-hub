@@ -26,6 +26,7 @@ interface User {
   email: string;
   name: string;
   photoURL: string | null;
+  division: string;
   department: string;
   position: string;
   role: "admin" | "member";
@@ -41,15 +42,30 @@ const DIVISIONS: Record<string, string[]> = {
   "CPO 본부": ["상품기획팀", "패션팀", "디자인팀"],
 };
 
-function getDivision(department: string): string {
-  for (const [div, teams] of Object.entries(DIVISIONS)) {
-    if (teams.includes(department)) return div;
-  }
-  return "미배정";
-}
-
+const DIVISION_NAMES = Object.keys(DIVISIONS);
 const ALL_TEAMS = Object.values(DIVISIONS).flat();
 const POSITIONS = ["사원", "팀장", "본부장", "대표"];
+const POSITION_RANK: Record<string, number> = {
+  대표: 0,
+  본부장: 1,
+  팀장: 2,
+  사원: 3,
+};
+
+function getUserDivision(u: User): string {
+  if (u.division) return u.division;
+  for (const [div, teams] of Object.entries(DIVISIONS)) {
+    if (teams.includes(u.department)) return div;
+  }
+  return "";
+}
+
+function sortByPosition(users: User[]): User[] {
+  return [...users].sort(
+    (a, b) =>
+      (POSITION_RANK[a.position] ?? 99) - (POSITION_RANK[b.position] ?? 99)
+  );
+}
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
@@ -128,25 +144,30 @@ export default function AdminUsersPage() {
       (u) =>
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
-        u.department.toLowerCase().includes(q) ||
+        (u.division || "").toLowerCase().includes(q) ||
+        (u.department || "").toLowerCase().includes(q) ||
         u.position.toLowerCase().includes(q)
     );
   }, [users, searchQuery, tab]);
 
   const grouped = useMemo(() => {
-    if (viewMode === "all") return { 전체: filteredUsers };
+    if (viewMode === "all") return { 전체: sortByPosition(filteredUsers) };
 
     const result: Record<string, User[]> = {};
 
     if (viewMode === "division") {
-      for (const div of Object.keys(DIVISIONS)) {
+      for (const div of DIVISION_NAMES) {
         result[div] = [];
       }
       result["미배정"] = [];
 
       for (const u of filteredUsers) {
-        const div = getDivision(u.department);
+        const div = getUserDivision(u) || "미배정";
         (result[div] ??= []).push(u);
+      }
+
+      for (const key of Object.keys(result)) {
+        result[key] = sortByPosition(result[key]);
       }
     } else {
       for (const team of ALL_TEAMS) {
@@ -158,9 +179,12 @@ export default function AdminUsersPage() {
         const key = u.department || "미배정";
         (result[key] ??= []).push(u);
       }
+
+      for (const key of Object.keys(result)) {
+        result[key] = sortByPosition(result[key]);
+      }
     }
 
-    // remove empty groups
     for (const key of Object.keys(result)) {
       if (result[key].length === 0) delete result[key];
     }
@@ -178,6 +202,15 @@ export default function AdminUsersPage() {
 
   const activeCount = users.filter((u) => u.isActive).length;
   const inactiveCount = users.filter((u) => !u.isActive).length;
+
+  function formatOrg(u: User) {
+    const div = u.division || getUserDivision(u);
+    const team = u.department || "";
+    if (div && team) return `${div} · ${team}`;
+    if (div) return div;
+    if (team) return team;
+    return "-";
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -209,9 +242,13 @@ export default function AdminUsersPage() {
         >
           <UserCheck size={14} />
           활성 사용자
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-            tab === "active" ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-500"
-          }`}>
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded-full ${
+              tab === "active"
+                ? "bg-accent/10 text-accent"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
             {activeCount}
           </span>
         </button>
@@ -225,9 +262,13 @@ export default function AdminUsersPage() {
         >
           <UserX size={14} />
           비활성화
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-            tab === "inactive" ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-500"
-          }`}>
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded-full ${
+              tab === "inactive"
+                ? "bg-accent/10 text-accent"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
             {inactiveCount}
           </span>
         </button>
@@ -243,7 +284,7 @@ export default function AdminUsersPage() {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="이름, 이메일, 부서, 직책 검색"
+            placeholder="이름, 이메일, 본부, 팀, 직책 검색"
             className="w-full h-9 pl-8 pr-3 rounded-lg border border-border bg-white text-sm text-text-primary focus:outline-none focus:border-accent"
           />
         </div>
@@ -280,7 +321,9 @@ export default function AdminUsersPage() {
           {Object.entries(grouped).map(([group, groupUsers]) => {
             const isCollapsed = collapsedGroups.has(group);
             const teams =
-              viewMode === "division" && group !== "미배정"
+              viewMode === "division" &&
+              group !== "미배정" &&
+              DIVISIONS[group]
                 ? DIVISIONS[group]
                 : null;
 
@@ -296,7 +339,10 @@ export default function AdminUsersPage() {
                     className="w-full flex items-center gap-2 px-4 py-3 bg-surface hover:bg-surface/80 transition-colors"
                   >
                     {isCollapsed ? (
-                      <ChevronRight size={14} className="text-text-secondary" />
+                      <ChevronRight
+                        size={14}
+                        className="text-text-secondary"
+                      />
                     ) : (
                       <ChevronDown size={14} className="text-text-secondary" />
                     )}
@@ -328,13 +374,13 @@ export default function AdminUsersPage() {
                           사용자
                         </th>
                         <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase">
-                          부서/직책
+                          소속
+                        </th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase">
+                          직책
                         </th>
                         <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase">
                           역할
-                        </th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase">
-                          상태
                         </th>
                         <th className="text-left px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase">
                           마지막 로그인
@@ -385,7 +431,16 @@ export default function AdminUsersPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-text-secondary">
-                              {u.department || "-"} / {u.position || "-"}
+                              {formatOrg(u)}
+                            </td>
+                            <td className="px-4 py-3">
+                              {u.position ? (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                                  {u.position}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-text-secondary">-</span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <span
@@ -401,17 +456,6 @@ export default function AdminUsersPage() {
                                   <Shield size={12} />
                                 )}
                                 {u.role === "admin" ? "관리자" : "멤버"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                                  u.isActive
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-600"
-                                }`}
-                              >
-                                {u.isActive ? "활성" : "비활성"}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-xs text-text-secondary">
@@ -525,15 +569,32 @@ function UserFormModal({
   const isEdit = !!user;
   const [email, setEmail] = useState(user?.email || "");
   const [name, setName] = useState(user?.name || "");
+  const [division, setDivision] = useState(
+    user?.division || getUserDivisionFromUser(user) || ""
+  );
   const [department, setDepartment] = useState(user?.department || "");
   const [position, setPosition] = useState(user?.position || "");
   const [role, setRole] = useState<"member" | "admin">(user?.role || "member");
-  const [dashboardAccess, setDashboardAccess] = useState<Record<string, string>>(
-    user?.dashboardAccess || {}
-  );
+  const [dashboardAccess, setDashboardAccess] = useState<
+    Record<string, string>
+  >(user?.dashboardAccess || {});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const roleDashboards = getDashboards().filter((d) => d.roles && d.roles.length > 0);
+  const roleDashboards = getDashboards().filter(
+    (d) => d.roles && d.roles.length > 0
+  );
+
+  const availableTeams = division ? DIVISIONS[division] || [] : [];
+
+  function handleDivisionChange(newDiv: string) {
+    setDivision(newDiv);
+    if (newDiv && department) {
+      const teams = DIVISIONS[newDiv] || [];
+      if (!teams.includes(department)) {
+        setDepartment("");
+      }
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -547,6 +608,7 @@ function UserFormModal({
         body: JSON.stringify({
           uid: user.uid,
           name,
+          division,
           department,
           position,
           role,
@@ -563,7 +625,14 @@ function UserFormModal({
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, department, position, role }),
+        body: JSON.stringify({
+          email,
+          name,
+          division,
+          department,
+          position,
+          role,
+        }),
       });
       if (res.ok) {
         onSaved();
@@ -620,26 +689,41 @@ function UserFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">
-                소속 팀
+                본부
+              </label>
+              <select
+                value={division}
+                onChange={(e) => handleDivisionChange(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+              >
+                <option value="">선택</option>
+                {DIVISION_NAMES.map((div) => (
+                  <option key={div} value={div}>
+                    {div}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">
+                팀
               </label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+                disabled={!division}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent disabled:opacity-50"
               >
-                <option value="">선택</option>
-                <option value="없음">없음</option>
-                {Object.entries(DIVISIONS).map(([div, teams]) => (
-                  <optgroup key={div} label={div}>
-                    {teams.map((team) => (
-                      <option key={team} value={team}>
-                        {team}
-                      </option>
-                    ))}
-                  </optgroup>
+                <option value="">없음</option>
+                {availableTeams.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
                 ))}
               </select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">
                 직책
@@ -657,92 +741,94 @@ function UserFormModal({
                 ))}
               </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
-              역할
-            </label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as "member" | "admin")}
-              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
-            >
-              <option value="member">멤버</option>
-              <option value="admin">관리자</option>
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">
+                역할
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as "member" | "admin")}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+              >
+                <option value="member">멤버</option>
+                <option value="admin">관리자</option>
+              </select>
+            </div>
           </div>
 
-          {roleDashboards.length > 0 && <div>
-            <label className="flex items-center gap-1.5 text-sm font-medium text-text-primary mb-2">
-              <LayoutDashboard size={14} />
-              대시보드 접근 권한
-            </label>
-            <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2.5">
-              {roleDashboards.map((d) => {
-                const currentRole = dashboardAccess[d.slug] || "";
+          {roleDashboards.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-sm font-medium text-text-primary mb-2">
+                <LayoutDashboard size={14} />
+                대시보드 접근 권한
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2.5">
+                {roleDashboards.map((d) => {
+                  const currentRole = dashboardAccess[d.slug] || "";
 
-                return (
-                  <div
-                    key={d.slug}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface"
-                  >
-                    <select
-                      value={currentRole}
-                      onChange={(e) => {
-                        setDashboardAccess((prev) => {
-                          const next = { ...prev };
-                          if (e.target.value) {
-                            next[d.slug] = e.target.value;
-                          } else {
-                            delete next[d.slug];
-                          }
-                          return next;
-                        });
-                      }}
-                      className="h-7 px-2 rounded border border-border bg-surface text-xs focus:outline-none focus:border-accent min-w-[80px]"
+                  return (
+                    <div
+                      key={d.slug}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface"
                     >
-                      <option value="">접근 불가</option>
-                      {d.roles!.map((r) => (
-                        <option key={r} value={r}>
-                          {d.roleLabels?.[r] || r}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-sm text-text-primary flex-1">
-                      {d.name}
-                    </span>
-                    {currentRole && (
-                      <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                        {d.roleLabels?.[currentRole] || currentRole}
+                      <select
+                        value={currentRole}
+                        onChange={(e) => {
+                          setDashboardAccess((prev) => {
+                            const next = { ...prev };
+                            if (e.target.value) {
+                              next[d.slug] = e.target.value;
+                            } else {
+                              delete next[d.slug];
+                            }
+                            return next;
+                          });
+                        }}
+                        className="h-7 px-2 rounded border border-border bg-surface text-xs focus:outline-none focus:border-accent min-w-[80px]"
+                      >
+                        <option value="">접근 불가</option>
+                        {d.roles!.map((r) => (
+                          <option key={r} value={r}>
+                            {d.roleLabels?.[r] || r}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-sm text-text-primary flex-1">
+                        {d.name}
                       </span>
-                    )}
-                  </div>
-                );
-              })}
+                      {currentRole && (
+                        <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                          {d.roleLabels?.[currentRole] || currentRole}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const all: Record<string, string> = {};
+                    for (const d of roleDashboards) {
+                      all[d.slug] = d.roles![0];
+                    }
+                    setDashboardAccess(all);
+                  }}
+                  className="text-xs text-accent hover:text-accent/80"
+                >
+                  전체 선택
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDashboardAccess({})}
+                  className="text-xs text-text-secondary hover:text-text-primary"
+                >
+                  전체 해제
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2 mt-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  const all: Record<string, string> = {};
-                  for (const d of roleDashboards) {
-                    all[d.slug] = d.roles![0];
-                  }
-                  setDashboardAccess(all);
-                }}
-                className="text-xs text-accent hover:text-accent/80"
-              >
-                전체 선택
-              </button>
-              <button
-                type="button"
-                onClick={() => setDashboardAccess({})}
-                className="text-xs text-text-secondary hover:text-text-primary"
-              >
-                전체 해제
-              </button>
-            </div>
-          </div>}
+          )}
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -776,4 +862,13 @@ function UserFormModal({
       </div>
     </div>
   );
+}
+
+function getUserDivisionFromUser(user?: User): string {
+  if (!user) return "";
+  if (user.division) return user.division;
+  for (const [div, teams] of Object.entries(DIVISIONS)) {
+    if (teams.includes(user.department)) return div;
+  }
+  return "";
 }

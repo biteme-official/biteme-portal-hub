@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   }
 
-  const { email, name, department, position, role } = await request.json();
+  const { email, name, division, department, position, role } = await request.json();
 
   if (!email?.endsWith("@biteme.co.kr")) {
     return Response.json(
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     email,
     name: name || email.split("@")[0],
     photoURL: null,
+    division: division || "",
     department: department || "",
     position: position || "",
     role: role || "member",
@@ -92,7 +93,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const allowed = ["name", "department", "position", "role", "isActive", "dashboardAccess"];
+  const allowed = ["name", "division", "department", "position", "role", "isActive", "dashboardAccess"];
   const filtered: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in updates) filtered[key] = updates[key];
