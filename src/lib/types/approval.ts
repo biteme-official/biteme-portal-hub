@@ -8,6 +8,14 @@ export type ApprovalStatus =
 
 export type StepStatus = "waiting" | "current" | "approved" | "rejected";
 
+export type VoteType = "none" | "options" | "yesno";
+
+export interface VoteOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
 export type ApprovalCategory =
   | "사업/전략"
   | "마케팅/프로모션"
@@ -33,6 +41,8 @@ export interface ApprovalStep {
   decidedAt: string | null;
   delegatedFrom?: { uid: string; name: string };
   delegatedBy?: string;
+  selectedOption?: string | null;
+  yesNoVote?: boolean | null;
 }
 
 export interface Attachment {
@@ -67,6 +77,8 @@ export interface ApprovalRequest {
   updatedAt: string;
   submittedAt: string | null;
   completedAt: string | null;
+  voteType: VoteType;
+  voteOptions: VoteOption[];
 }
 
 export interface ApprovalFormData {
@@ -77,6 +89,8 @@ export interface ApprovalFormData {
   approvers: UserRef[];
   ccList: UserRef[];
   attachments: Attachment[];
+  voteType?: VoteType;
+  voteOptions?: VoteOption[];
 }
 
 export const APPROVAL_CATEGORIES: ApprovalCategory[] = [

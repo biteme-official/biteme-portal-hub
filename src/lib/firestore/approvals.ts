@@ -33,6 +33,8 @@ function docToApproval(
     updatedAt: tsToString(d.updatedAt) || new Date().toISOString(),
     submittedAt: tsToString(d.submittedAt),
     completedAt: tsToString(d.completedAt),
+    voteType: d.voteType || "none",
+    voteOptions: d.voteOptions || [],
   };
 }
 
@@ -67,6 +69,8 @@ export async function createApproval(
     updatedAt: FieldValue.serverTimestamp(),
     submittedAt: null,
     completedAt: null,
+    voteType: data.voteType || "none",
+    voteOptions: data.voteOptions || [],
   });
 
   return docRef.id;
@@ -139,6 +143,8 @@ export async function updateDraft(
   if (data.isUrgent !== undefined) updates.isUrgent = data.isUrgent;
   if (data.attachments !== undefined) updates.attachments = data.attachments;
   if (data.ccList !== undefined) updates.ccList = data.ccList;
+  if (data.voteType !== undefined) updates.voteType = data.voteType;
+  if (data.voteOptions !== undefined) updates.voteOptions = data.voteOptions;
   if (data.approvers !== undefined) {
     updates.approvalLine = data.approvers.map((approver, i) => ({
       stepOrder: i + 1,
@@ -200,7 +206,8 @@ export async function decideStep(
   id: string,
   approverUid: string,
   action: "approve" | "reject",
-  comment?: string
+  comment?: string,
+  vote?: { selectedOption?: string | null; yesNoVote?: boolean | null }
 ) {
   const db = getAdminDb();
   const docRef = db.collection("approvals").doc(id);
@@ -244,6 +251,8 @@ export async function decideStep(
       comment: comment || null,
       decidedAt: new Date().toISOString(),
       ...(isDelegated ? { delegatedBy: approverUid } : {}),
+      ...(vote?.selectedOption !== undefined ? { selectedOption: vote.selectedOption } : {}),
+      ...(vote?.yesNoVote !== undefined ? { yesNoVote: vote.yesNoVote } : {}),
     };
 
     if (action === "reject") {

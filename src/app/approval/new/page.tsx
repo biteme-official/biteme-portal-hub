@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { StampLineEditor } from "@/components/approval/StampLine";
 import ApproverPicker from "@/components/approval/ApproverPicker";
@@ -14,6 +14,8 @@ import {
   type ApprovalCategory,
   type UserRef,
   type Attachment,
+  type VoteType,
+  type VoteOption,
 } from "@/lib/types/approval";
 
 export default function NewApprovalPage() {
@@ -26,6 +28,11 @@ export default function NewApprovalPage() {
   const [approvers, setApprovers] = useState<UserRef[]>([]);
   const [ccList, setCcList] = useState<UserRef[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [voteType, setVoteType] = useState<VoteType>("none");
+  const [voteOptions, setVoteOptions] = useState<VoteOption[]>([
+    { id: "1", label: "1안", description: "" },
+    { id: "2", label: "2안", description: "" },
+  ]);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +48,7 @@ export default function NewApprovalPage() {
     const res = await fetch("/api/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments }),
+      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
     });
 
     if (res.ok) {
@@ -62,13 +69,17 @@ export default function NewApprovalPage() {
       setError("결재자를 1명 이상 지정해주세요.");
       return;
     }
+    if (voteType === "options" && voteOptions.filter(o => o.label.trim()).length < 2) {
+      setError("안건 선택형은 최소 2개 옵션이 필요합니다.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
     const createRes = await fetch("/api/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments }),
+      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
     });
 
     if (!createRes.ok) {
@@ -220,6 +231,87 @@ export default function NewApprovalPage() {
             rows={6}
             className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent resize-y"
           />
+        </div>
+
+        {/* 의견 수집 유형 */}
+        <div>
+          <label className="block text-sm font-medium text-text-primary mb-2">
+            의견 수집
+          </label>
+          <div className="flex gap-2">
+            {([["none", "없음"], ["options", "안건 선택형"], ["yesno", "Y/N 투표"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setVoteType(val)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  voteType === val
+                    ? "bg-accent text-white border-accent"
+                    : "bg-surface text-text-secondary border-border hover:bg-gray-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {voteType === "options" && (
+            <div className="mt-3 space-y-2">
+              {voteOptions.map((opt, i) => (
+                <div key={opt.id} className="flex items-center gap-2">
+                  <span className="text-xs text-text-secondary w-6 text-center shrink-0">{i + 1}안</span>
+                  <input
+                    value={opt.label}
+                    onChange={(e) => {
+                      const next = [...voteOptions];
+                      next[i] = { ...next[i], label: e.target.value };
+                      setVoteOptions(next);
+                    }}
+                    placeholder={`${i + 1}안 제목`}
+                    className="flex-1 h-9 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+                  />
+                  <input
+                    value={opt.description || ""}
+                    onChange={(e) => {
+                      const next = [...voteOptions];
+                      next[i] = { ...next[i], description: e.target.value };
+                      setVoteOptions(next);
+                    }}
+                    placeholder="설명 (선택)"
+                    className="flex-1 h-9 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+                  />
+                  {voteOptions.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setVoteOptions(voteOptions.filter((_, j) => j !== i))}
+                      className="p-1.5 text-text-secondary hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setVoteOptions([
+                    ...voteOptions,
+                    { id: String(Date.now()), label: `${voteOptions.length + 1}안`, description: "" },
+                  ])
+                }
+                className="flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 transition-colors mt-1"
+              >
+                <Plus size={14} />
+                옵션 추가
+              </button>
+            </div>
+          )}
+
+          {voteType === "yesno" && (
+            <p className="mt-2 text-xs text-text-secondary">
+              결재자가 찬성(Y) / 반대(N) 의견을 선택한 후 승인/반려합니다.
+            </p>
+          )}
         </div>
 
         <FileUpload files={attachments} onChange={setAttachments} />

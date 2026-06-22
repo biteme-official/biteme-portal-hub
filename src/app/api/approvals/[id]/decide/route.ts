@@ -11,7 +11,7 @@ export async function POST(
 
   const { id } = await params;
   try {
-    const { action, comment } = await request.json();
+    const { action, comment, selectedOption, yesNoVote } = await request.json();
 
     if (action !== "approve" && action !== "reject") {
       return Response.json({ error: "action은 approve 또는 reject만 가능합니다." }, { status: 400 });
@@ -21,7 +21,12 @@ export async function POST(
       return Response.json({ error: "반려 시 사유를 입력해야 합니다." }, { status: 400 });
     }
 
-    await decideStep(id, session.uid, action, comment);
+    const vote = {
+      ...(selectedOption !== undefined ? { selectedOption } : {}),
+      ...(yesNoVote !== undefined ? { yesNoVote } : {}),
+    };
+
+    await decideStep(id, session.uid, action, comment, vote);
 
     const approval = await getApproval(id);
     if (approval) {
