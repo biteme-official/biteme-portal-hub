@@ -24,34 +24,56 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    const userRef = adminDb.collection("users").doc(decoded.uid);
-    const userDoc = await userRef.get();
+
+    let userRef = adminDb.collection("users").doc(decoded.uid);
+    let userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      const usersSnapshot = await adminDb.collection("users").limit(1).get();
-      if (usersSnapshot.empty) {
+      const byEmail = await adminDb
+        .collection("users")
+        .where("email", "==", decoded.email)
+        .limit(1)
+        .get();
+
+      if (!byEmail.empty) {
+        const oldDoc = byEmail.docs[0];
+        const oldData = oldDoc.data();
+
         await userRef.set({
+          ...oldData,
           uid: decoded.uid,
-          email: decoded.email,
-          name: decoded.name || decoded.email.split("@")[0],
-          photoURL: decoded.picture || null,
-          department: "",
-          position: "",
-          role: "admin",
-          isActive: true,
-          createdAt: FieldValue.serverTimestamp(),
+          photoURL: decoded.picture || oldData.photoURL || null,
           lastLoginAt: FieldValue.serverTimestamp(),
         });
+        await oldDoc.ref.delete();
+        userDoc = await userRef.get();
       } else {
-        return Response.json(
-          { error: "등록되지 않은 사용자입니다. 관리자에게 등록을 요청하세요." },
-          { status: 403 }
-        );
+        const usersSnapshot = await adminDb.collection("users").limit(1).get();
+        if (usersSnapshot.empty) {
+          await userRef.set({
+            uid: decoded.uid,
+            email: decoded.email,
+            name: decoded.name || decoded.email.split("@")[0],
+            photoURL: decoded.picture || null,
+            division: "",
+            department: "",
+            position: "",
+            role: "admin",
+            isActive: true,
+            createdAt: FieldValue.serverTimestamp(),
+            lastLoginAt: FieldValue.serverTimestamp(),
+          });
+          userDoc = await userRef.get();
+        } else {
+          return Response.json(
+            { error: "등록되지 않은 사용자입니다. 관리자에게 등록을 요청하세요." },
+            { status: 403 }
+          );
+        }
       }
     }
 
-    const freshDoc = userDoc.exists ? userDoc : await userRef.get();
-    const userData = freshDoc.data()!;
+    const userData = userDoc.data()!;
 
     if (!userData.isActive) {
       return Response.json(
@@ -65,15 +87,15 @@ export async function POST(request: Request) {
     const { token, expiresAt } = await createSessionToken({
       uid: decoded.uid,
       email: decoded.email!,
-      name: decoded.name || decoded.email!.split("@")[0],
-      photoURL: decoded.picture || null,
+      name: userData.name || decoded.name || decoded.email!.split("@")[0],
+      photoURL: decoded.picture || userData.photoURL || null,
       role: (userData.role as "admin" | "member") || "member",
     });
 
     const response = NextResponse.json({
       uid: decoded.uid,
       email: decoded.email,
-      name: decoded.name || decoded.email!.split("@")[0],
+      name: userData.name || decoded.name || decoded.email!.split("@")[0],
       photoURL: decoded.picture || null,
     });
 
