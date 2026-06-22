@@ -17,6 +17,7 @@ import {
   Users,
   Pencil,
   LayoutDashboard,
+  Trash2,
 } from "lucide-react";
 import { getDashboards } from "@/lib/dashboards";
 
@@ -82,6 +83,16 @@ export default function AdminUsersPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid, isActive: !isActive }),
+    });
+    fetchUsers();
+  }
+
+  async function deleteUser(uid: string, name: string) {
+    if (!confirm(`"${name}" 사용자를 완전히 삭제하시겠습니까?`)) return;
+    await fetch("/api/admin/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid }),
     });
     fetchUsers();
   }
@@ -452,6 +463,15 @@ export default function AdminUsersPage() {
                                       ) : (
                                         <UserCheck size={14} />
                                       )}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        deleteUser(u.uid, u.name)
+                                      }
+                                      className="p-1.5 rounded-md hover:bg-red-50 text-text-secondary hover:text-red-500 transition-colors"
+                                      title="삭제"
+                                    >
+                                      <Trash2 size={14} />
                                     </button>
                                   </>
                                 )}
