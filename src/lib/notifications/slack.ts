@@ -119,6 +119,36 @@ interface SlackDmParams {
   body: string;
   approvalId?: string;
   linkUrl?: string;
+  targetUserUid?: string;
+}
+
+function buildUserRegisteredBlocks(body: string, targetUserUid: string, link: string) {
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `👤 *신규 사용자 가입*\n${body}`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "✅ 승인" },
+          action_id: "approve_user",
+          value: targetUserUid,
+          style: "primary",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "포털에서 확인" },
+          url: link,
+        },
+      ],
+    },
+  ];
 }
 
 export async function sendSlackDm(params: SlackDmParams) {
@@ -130,7 +160,11 @@ export async function sendSlackDm(params: SlackDmParams) {
     : params.approvalId
       ? `${PORTAL_URL}/approval/${params.approvalId}`
       : PORTAL_URL;
-  const blocks = buildBlocks(params.type, params.title, params.body, link);
+
+  const isUserReg = params.type === "user_registered" && params.targetUserUid;
+  const blocks = isUserReg
+    ? buildUserRegisteredBlocks(params.body, params.targetUserUid!, link)
+    : buildBlocks(params.type, params.title, params.body, link);
 
   const results = await Promise.allSettled(
     params.recipientEmails.map(async (email) => {
@@ -145,6 +179,37 @@ export async function sendSlackDm(params: SlackDmParams) {
     console.error(`Slack DM: ${failed}/${results.length} failed`);
   }
 }
+
+export async function sendUserApprovedDm(userEmail: string, userName: string) {
+  if (!BOT_TOKEN) return;
+  const slackId = await getSlackUserId(userEmail);
+  if (!slackId) return;
+
+  const blocks = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `🎉 *가입 승인 완료*\n${userName}님, 바잇미 포털 가입이 승인되었습니다. 지금 로그인하세요!`,
+      },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "포털 바로가기" },
+          url: PORTAL_URL,
+          style: "primary",
+        },
+      ],
+    },
+  ];
+
+  await sendDm(slackId, blocks, "#22c55e");
+}
+
+export { slackApi };
 
 export async function sendSlackReminders(
   items: {

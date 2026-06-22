@@ -60,6 +60,7 @@ export async function dispatchNotification(params: NotifyParams) {
         body: params.body,
         approvalId: params.approvalId,
         linkUrl: params.linkUrl,
+        targetUserUid: params.targetUserUid,
       })
     )
     .catch((e) => console.error("Slack DM error:", e));
