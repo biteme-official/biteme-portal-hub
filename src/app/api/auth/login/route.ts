@@ -76,10 +76,11 @@ export async function POST(request: Request) {
       photoURL: decoded.picture || null,
     });
   } catch (err) {
-    console.error("Login error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Login error:", message, err);
     return Response.json(
-      { error: "인증에 실패했습니다." },
-      { status: 401 }
+      { error: "인증에 실패했습니다.", detail: message },
+      { status: 500 }
     );
   }
 }
