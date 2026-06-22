@@ -101,3 +101,27 @@ export async function PATCH(request: Request) {
   await userRef.update(filtered);
   return Response.json({ success: true });
 }
+
+export async function DELETE(request: Request) {
+  const admin = await verifyAdmin();
+  if (!admin) {
+    return Response.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+  }
+
+  const { uid } = await request.json();
+
+  if (!uid) {
+    return Response.json({ error: "uid가 필요합니다." }, { status: 400 });
+  }
+
+  const db = getAdminDb();
+  const userRef = db.collection("users").doc(uid);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists) {
+    return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
+  }
+
+  await userRef.delete();
+  return Response.json({ success: true });
+}

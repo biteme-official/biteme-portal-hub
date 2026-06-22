@@ -63,6 +63,7 @@ export default function AdminUsersPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set()
   );
+  const [tab, setTab] = useState<"active" | "inactive">("active");
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -107,16 +108,19 @@ export default function AdminUsersPage() {
   }
 
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
+    const byTab = users.filter((u) =>
+      tab === "active" ? u.isActive : !u.isActive
+    );
+    if (!searchQuery.trim()) return byTab;
     const q = searchQuery.toLowerCase();
-    return users.filter(
+    return byTab.filter(
       (u) =>
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.department.toLowerCase().includes(q) ||
         u.position.toLowerCase().includes(q)
     );
-  }, [users, searchQuery]);
+  }, [users, searchQuery, tab]);
 
   const grouped = useMemo(() => {
     if (viewMode === "all") return { 전체: filteredUsers };
@@ -162,6 +166,7 @@ export default function AdminUsersPage() {
   }
 
   const activeCount = users.filter((u) => u.isActive).length;
+  const inactiveCount = users.filter((u) => !u.isActive).length;
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -178,6 +183,42 @@ export default function AdminUsersPage() {
         >
           <UserPlus size={16} />
           사용자 추가
+        </button>
+      </div>
+
+      {/* Active / Inactive Tabs */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border">
+        <button
+          onClick={() => setTab("active")}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === "active"
+              ? "border-accent text-accent"
+              : "border-transparent text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          <UserCheck size={14} />
+          활성 사용자
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+            tab === "active" ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-500"
+          }`}>
+            {activeCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setTab("inactive")}
+          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            tab === "inactive"
+              ? "border-accent text-accent"
+              : "border-transparent text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          <UserX size={14} />
+          비활성화
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+            tab === "inactive" ? "bg-accent/10 text-accent" : "bg-gray-100 text-gray-500"
+          }`}>
+            {inactiveCount}
+          </span>
         </button>
       </div>
 
