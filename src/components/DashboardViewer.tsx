@@ -9,10 +9,16 @@ import {
   ChevronRight,
   Loader2,
   ShieldX,
+  Cookie,
+  X as XIcon,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import type { Dashboard } from "@/lib/types";
 import { getCategories } from "@/lib/dashboards";
+
+const isNgrokUrl = (url: string) => url.includes("ngrok");
 
 export default function DashboardViewer({
   dashboard,
@@ -23,6 +29,15 @@ export default function DashboardViewer({
   const [fullscreen, setFullscreen] = useState(false);
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [showCookieGuide, setShowCookieGuide] = useState(() => {
+    if (!isNgrokUrl(dashboard.path)) return false;
+    try {
+      return localStorage.getItem("ngrok-cookie-guide-dismissed") !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const [guideExpanded, setGuideExpanded] = useState(false);
   const categories = getCategories();
   const cat = categories.find((c) => c.id === dashboard.category);
 
@@ -110,6 +125,52 @@ export default function DashboardViewer({
           </button>
         </div>
       </div>
+
+      {showCookieGuide && (
+        <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200 shrink-0">
+          <div className="flex items-start gap-2.5">
+            <Cookie size={14} className="text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-amber-900">
+                  대시보드가 안 보이나요? 서드파티 쿠키 허용이 필요합니다
+                </p>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => setGuideExpanded(!guideExpanded)}
+                    className="text-amber-600 hover:text-amber-800 p-0.5"
+                  >
+                    {guideExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCookieGuide(false);
+                      try { localStorage.setItem("ngrok-cookie-guide-dismissed", "1"); } catch {}
+                    }}
+                    className="text-amber-400 hover:text-amber-600 p-0.5"
+                  >
+                    <XIcon size={14} />
+                  </button>
+                </div>
+              </div>
+              {guideExpanded && (
+                <div className="mt-2 space-y-2 text-xs text-amber-800">
+                  <p className="font-medium">Chrome 설정 방법:</p>
+                  <ol className="list-decimal list-inside space-y-1.5 ml-1">
+                    <li>주소창 왼쪽의 <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-100 rounded text-[11px] font-mono">자물쇠</span> 또는 <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-100 rounded text-[11px] font-mono">설정</span> 아이콘 클릭</li>
+                    <li><strong>쿠키 및 사이트 데이터</strong> 선택</li>
+                    <li><strong>서드파티 쿠키 허용</strong>으로 변경</li>
+                    <li>페이지 새로고침 (F5)</li>
+                  </ol>
+                  <div className="pt-1.5 border-t border-amber-200">
+                    <p className="text-amber-700">또는 <strong>새 탭</strong> 버튼으로 대시보드를 직접 열어 &quot;Visit Site&quot; 클릭 후 돌아오면 됩니다.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 relative bg-surface">
         {accessDenied ? (
