@@ -48,6 +48,7 @@ function getDivision(department: string): string {
 }
 
 const ALL_TEAMS = Object.values(DIVISIONS).flat();
+const POSITIONS = ["사원", "팀장", "본부장", "대표"];
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
@@ -566,6 +567,7 @@ function UserFormModal({
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
               >
                 <option value="">선택</option>
+                <option value="없음">없음</option>
                 {Object.entries(DIVISIONS).map(([div, teams]) => (
                   <optgroup key={div} label={div}>
                     {teams.map((team) => (
@@ -581,13 +583,18 @@ function UserFormModal({
               <label className="block text-sm font-medium text-text-primary mb-1">
                 직책
               </label>
-              <input
-                type="text"
+              <select
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
-                placeholder="매니저"
                 className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
-              />
+              >
+                <option value="">선택</option>
+                {POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div>
