@@ -15,6 +15,7 @@ import {
   Image,
   Link2,
   UserRoundCog,
+  Trash2,
 } from "lucide-react";
 import StatusBadge from "@/components/approval/StatusBadge";
 import { StampLineDisplay } from "@/components/approval/StampLine";
@@ -63,6 +64,7 @@ export default function ApprovalDetailPage() {
   }
 
   const isRequester = user?.uid === approval.requester.uid;
+  const isAdmin = user?.role === "admin";
   const currentStep = approval.approvalLine.find(
     (s) => s.status === "current"
   );
@@ -254,7 +256,7 @@ export default function ApprovalDetailPage() {
         )}
 
         {/* Actions */}
-        {(canApprove || canCancel || approval.status === "draft") && (
+        {(canApprove || canCancel || approval.status === "draft" || isAdmin) && (
           <div className="bg-white rounded-xl border border-border p-5">
             {canApprove && !showRejectForm && (
               <div className="flex flex-wrap gap-2">
@@ -336,15 +338,17 @@ export default function ApprovalDetailPage() {
               </button>
             )}
 
-            {approval.status === "draft" && isRequester && (
+            {(approval.status === "draft" && isRequester) || isAdmin ? (
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                className={`flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors ${
+                  canApprove || canCancel ? "mt-3" : ""
+                }`}
               >
-                <X size={14} />
-                삭제
+                <Trash2 size={14} />
+                {isAdmin ? "삭제 (관리자)" : "삭제"}
               </button>
-            )}
+            ) : null}
           </div>
         )}
 

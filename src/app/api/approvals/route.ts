@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { createApproval, listApprovals } from "@/lib/firestore/approvals";
+import { createApproval, listApprovals, deleteAllApprovals, deleteApprovalAsAdmin } from "@/lib/firestore/approvals";
 import { getAdminDb } from "@/lib/firebase/admin";
 import type { ApprovalStatus } from "@/lib/types/approval";
 
@@ -57,5 +57,35 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "생성 실패";
     return Response.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "admin") {
+    return Response.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+  }
+
+  try {
+    const body = await request.json().catch(() => null);
+    const ids: string[] | undefined = body?.ids;
+
+    if (ids && Array.isArray(ids)) {
+      let deleted = 0;
+      for (const id of ids) {
+        try {
+          await deleteApprovalAsAdmin(id);
+          deleted++;
+        } catch { /* skip */ }
+      }
+      return Response.json({ deleted });
+    }
+
+    const deleted = await deleteAllApprovals();
+    return Response.json({ deleted, message: `${deleted}건 삭제 완료` });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "삭제 실패";
+    return Response.json({ error: message }, { status: 500 });
   }
 }

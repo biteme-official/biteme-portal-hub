@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { getApproval, updateDraft, deleteDraft } from "@/lib/firestore/approvals";
+import { getApproval, updateDraft, deleteDraft, deleteApprovalAsAdmin } from "@/lib/firestore/approvals";
 
 export async function GET(
   _request: Request,
@@ -44,7 +44,11 @@ export async function DELETE(
 
   const { id } = await params;
   try {
-    await deleteDraft(id, session.uid);
+    if (session.role === "admin") {
+      await deleteApprovalAsAdmin(id);
+    } else {
+      await deleteDraft(id, session.uid);
+    }
     return Response.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "삭제 실패";

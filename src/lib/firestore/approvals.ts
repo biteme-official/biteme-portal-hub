@@ -282,6 +282,25 @@ export async function decideStep(
   });
 }
 
+export async function deleteApprovalAsAdmin(id: string) {
+  const db = getAdminDb();
+  const docRef = db.collection("approvals").doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
+  await docRef.delete();
+}
+
+export async function deleteAllApprovals(): Promise<number> {
+  const db = getAdminDb();
+  const snapshot = await db.collection("approvals").get();
+  if (snapshot.empty) return 0;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return snapshot.size;
+}
+
 export async function cancelApproval(id: string, requesterUid: string) {
   const db = getAdminDb();
   const docRef = db.collection("approvals").doc(id);

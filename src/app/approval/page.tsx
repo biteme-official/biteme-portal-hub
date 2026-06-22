@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { Plus, Loader2, Inbox, Search, CheckSquare } from "lucide-react";
+import { Plus, Loader2, Inbox, Search, CheckSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ApprovalCard from "@/components/approval/ApprovalCard";
@@ -48,6 +48,8 @@ function ApprovalListContent() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const isAdmin = user?.role === "admin";
 
   const fetchApprovals = useCallback(async () => {
     setLoading(true);
@@ -170,6 +172,26 @@ function ApprovalListContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && approvals.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!confirm(`전체 ${approvals.length}건의 결재 문서를 삭제하시겠습니까?`)) return;
+                setDeleteLoading(true);
+                const res = await fetch("/api/approvals", { method: "DELETE" });
+                if (res.ok) {
+                  const data = await res.json();
+                  alert(`${data.deleted}건 삭제 완료`);
+                  fetchApprovals();
+                }
+                setDeleteLoading(false);
+              }}
+              disabled={deleteLoading}
+              className="flex items-center gap-1.5 px-3 py-2.5 border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              전체 삭제
+            </button>
+          )}
           <DelegationSetting />
           <Link
             href="/approval/new"
