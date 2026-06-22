@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { signInWithPopup } from "firebase/auth";
 import { getClientAuth, getGoogleProvider } from "@/lib/firebase/client";
-import { LayoutDashboard, Loader2 } from "lucide-react";
+import { LayoutDashboard, Loader2, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -27,6 +28,10 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json();
+        if (data.pending) {
+          setPending(true);
+          return;
+        }
         throw new Error(data.error || "로그인에 실패했습니다.");
       }
 
@@ -43,6 +48,33 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (pending) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-4">
+              <Clock size={28} className="text-amber-500" />
+            </div>
+            <h1 className="text-xl font-bold text-text-primary">
+              승인 대기 중
+            </h1>
+            <p className="text-sm text-text-secondary mt-2 text-center leading-relaxed">
+              계정이 등록되었습니다.<br />
+              관리자가 승인하면 로그인할 수 있습니다.
+            </p>
+          </div>
+          <button
+            onClick={() => setPending(false)}
+            className="w-full h-10 border border-border rounded-xl text-sm text-text-secondary hover:bg-surface transition-colors"
+          >
+            돌아가기
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         userDoc = await userRef.get();
       } else {
         const usersSnapshot = await adminDb.collection("users").limit(1).get();
+        const isFirstUser = usersSnapshot.empty;
         await userRef.set({
           uid: decoded.uid,
           email: decoded.email!,
@@ -57,11 +58,11 @@ export async function POST(request: Request) {
           division: "",
           department: "",
           position: "",
-          role: usersSnapshot.empty ? "admin" : "member",
-          isActive: true,
+          role: isFirstUser ? "admin" : "member",
+          isActive: isFirstUser,
           dashboardAccess: {},
           createdAt: FieldValue.serverTimestamp(),
-          lastLoginAt: FieldValue.serverTimestamp(),
+          lastLoginAt: null,
         });
         userDoc = await userRef.get();
       }
@@ -70,8 +71,14 @@ export async function POST(request: Request) {
     const userData = userDoc.data()!;
 
     if (!userData.isActive) {
+      const isPending = !userData.lastLoginAt;
       return Response.json(
-        { error: "비활성화된 계정입니다. 관리자에게 문의하세요." },
+        {
+          error: isPending
+            ? "관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다."
+            : "비활성화된 계정입니다. 관리자에게 문의하세요.",
+          pending: isPending,
+        },
         { status: 403 }
       );
     }

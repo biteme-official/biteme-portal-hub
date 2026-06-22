@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { Plus, Loader2, Inbox, Search, CheckSquare, Trash2 } from "lucide-react";
+import { Plus, Loader2, Inbox, Search, CheckSquare, Trash2, Info, X as XIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import ApprovalCard from "@/components/approval/ApprovalCard";
@@ -49,6 +49,9 @@ function ApprovalListContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showGuide, setShowGuide] = useState(() => {
+    try { return sessionStorage.getItem("approval-guide-dismissed") !== "1"; } catch { return true; }
+  });
   const isAdmin = user?.role === "admin";
 
   const fetchApprovals = useCallback(async () => {
@@ -202,6 +205,28 @@ function ApprovalListContent() {
           </Link>
         </div>
       </div>
+
+      {showGuide && (
+        <div className="flex items-start gap-3 mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <Info size={16} className="text-blue-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900 mb-1">포털 전자결재 안내</p>
+            <p className="text-xs text-blue-700 leading-relaxed">
+              실제 비용 결재는 위하고에서 처리합니다. 포털 전자결재는 커뮤니케이션 소실 방지 및 의사결정 구조 확립을 위한 사전 합의 도구입니다.
+              결재 요청 시 승인라인을 지정하고, 결재자는 승인/반려할 수 있습니다.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setShowGuide(false);
+              try { sessionStorage.setItem("approval-guide-dismissed", "1"); } catch {}
+            }}
+            className="text-blue-400 hover:text-blue-600 shrink-0"
+          >
+            <XIcon size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="relative mb-4">
         <Search
