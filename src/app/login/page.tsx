@@ -30,8 +30,7 @@ export default function LoginPage() {
         throw new Error(data.error || "로그인에 실패했습니다.");
       }
 
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "로그인에 실패했습니다.";
