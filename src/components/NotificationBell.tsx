@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -33,6 +33,7 @@ export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [activatingUid, setActivatingUid] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -85,6 +86,28 @@ export default function NotificationBell() {
     });
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
+  }
+
+  async function handleActivateUser(uid: string, notifId: string) {
+    setActivatingUid(uid);
+    try {
+      const res = await fetch("/api/admin/users/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid }),
+      });
+      if (res.ok) {
+        markAsRead([notifId]);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notifId ? { ...n, body: n.body.replace(/가입했습니다\.$/, "가입했습니다. ✅ 승인완료"), isRead: true } : n
+          )
+        );
+      }
+    } catch {
+      // silent
+    }
+    setActivatingUid(null);
   }
 
   if (loading || !user) return null;
@@ -145,14 +168,30 @@ export default function NotificationBell() {
                     <p className="text-sm text-text-primary line-clamp-2">
                       {n.body}
                     </p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      {n.createdAt
-                        ? formatDistanceToNow(new Date(n.createdAt), {
-                            addSuffix: true,
-                            locale: ko,
-                          })
-                        : ""}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-text-secondary">
+                        {n.createdAt
+                          ? formatDistanceToNow(new Date(n.createdAt), {
+                              addSuffix: true,
+                              locale: ko,
+                            })
+                          : ""}
+                      </p>
+                      {n.type === "user_registered" && n.targetUserUid && !n.body.includes("승인완료") && user?.role === "admin" && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleActivateUser(n.targetUserUid!, n.id);
+                          }}
+                          disabled={activatingUid === n.targetUserUid}
+                          className="flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-600 text-[11px] font-medium rounded-md hover:bg-green-100 transition-colors disabled:opacity-50"
+                        >
+                          <UserCheck size={11} />
+                          {activatingUid === n.targetUserUid ? "처리중..." : "승인"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {!n.isRead && (
                     <span className="w-2 h-2 bg-accent rounded-full shrink-0 mt-2" />

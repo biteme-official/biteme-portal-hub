@@ -16,6 +16,7 @@ export interface Notification {
   approvalId?: string;
   approvalTitle?: string;
   linkUrl?: string;
+  targetUserUid?: string;
   isRead: boolean;
   createdAt: string;
 }

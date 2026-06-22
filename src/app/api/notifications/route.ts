@@ -26,6 +26,7 @@ export async function GET() {
       approvalId: d.approvalId || "",
       approvalTitle: d.approvalTitle || "",
       linkUrl: d.linkUrl || "",
+      targetUserUid: d.targetUserUid || "",
       isRead: d.isRead || false,
       createdAt: d.createdAt?.toDate?.()?.toISOString() || "",
     };

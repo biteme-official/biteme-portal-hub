@@ -12,6 +12,7 @@ interface NotifyParams {
   approvalId?: string;
   approvalTitle?: string;
   linkUrl?: string;
+  targetUserUid?: string;
 }
 
 async function getEmailsByUids(uids: string[]): Promise<string[]> {
@@ -44,6 +45,7 @@ export async function dispatchNotification(params: NotifyParams) {
     if (params.approvalId) doc.approvalId = params.approvalId;
     if (params.approvalTitle) doc.approvalTitle = params.approvalTitle;
     if (params.linkUrl) doc.linkUrl = params.linkUrl;
+    if (params.targetUserUid) doc.targetUserUid = params.targetUserUid;
     batch.set(docRef, doc);
   }
 
@@ -136,7 +138,8 @@ export async function notifyComment(
 
 export async function notifyNewUserRegistered(
   userName: string,
-  userEmail: string
+  userEmail: string,
+  userUid?: string
 ) {
   const db = getAdminDb();
   const adminsSnap = await db
@@ -152,7 +155,8 @@ export async function notifyNewUserRegistered(
     recipientUids: adminUids,
     type: "user_registered",
     title: "신규 사용자 가입",
-    body: `${userName}(${userEmail})님이 포털에 가입했습니다. 사용자 관리에서 승인해주세요.`,
+    body: `${userName}(${userEmail})님이 포털에 가입했습니다.`,
     linkUrl: "/admin/users",
+    targetUserUid: userUid,
   });
 }

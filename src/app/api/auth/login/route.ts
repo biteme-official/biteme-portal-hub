@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         userDoc = await userRef.get();
 
         if (!isFirstUser) {
-          notifyNewUserRegistered(newUserName, decoded.email!).catch((e) =>
+          notifyNewUserRegistered(newUserName, decoded.email!, decoded.uid).catch((e) =>
             console.error("New user notification error:", e)
           );
         }
