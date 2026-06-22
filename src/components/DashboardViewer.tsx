@@ -38,6 +38,7 @@ export default function DashboardViewer({
           setLoading(false);
           return null;
         }
+        if (!r.ok) throw new Error(`iframe-token ${r.status}`);
         return r.json();
       })
       .then((data) => {
@@ -47,7 +48,8 @@ export default function DashboardViewer({
           setIframeSrc(url.toString());
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("iframe-token error:", err);
         setIframeSrc(dashboard.path);
       });
   }, [dashboard.slug, dashboard.path]);
