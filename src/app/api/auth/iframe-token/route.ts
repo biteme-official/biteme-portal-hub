@@ -23,7 +23,9 @@ export async function POST(request: Request) {
   const userData = userDoc.data();
   const access: Record<string, string> = userData?.dashboardAccess || {};
 
-  const dashboardRole = access[slug];
+  const ROLE_MIGRATION: Record<string, string> = { marketing: "viewer", cs: "viewer" };
+  const rawRole = access[slug];
+  const dashboardRole = rawRole ? (ROLE_MIGRATION[rawRole] || rawRole) : undefined;
 
   if (hasRoles && userData?.role !== "admin" && !dashboardRole) {
     return Response.json(

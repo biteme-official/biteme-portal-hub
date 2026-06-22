@@ -55,15 +55,14 @@
       "owner": "전략기획팀",
       "tags": ["프로덕트", "현황"],
       "github": "https://github.com/biteme-official/product-dashboard",
-      "roles": ["master", "pm", "marketing", "platform_md", "brand_md", "global", "cs"],
+      "roles": ["master", "pm", "viewer", "platform_md", "brand_md", "global"],
       "roleLabels": {
         "master": "마스터",
         "pm": "PM",
-        "marketing": "마케팅",
+        "viewer": "VIEWER",
         "platform_md": "플랫폼 MD",
         "brand_md": "브랜드 MD",
-        "global": "글로벌",
-        "cs": "CS"
+        "global": "글로벌"
       }
     },
     {
