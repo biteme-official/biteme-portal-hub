@@ -8,12 +8,27 @@ export async function GET() {
   }
 
   const db = getAdminDb();
-  const snapshot = await db
-    .collection("notifications")
-    .where("recipientUid", "==", session.uid)
-    .orderBy("createdAt", "desc")
-    .limit(50)
-    .get();
+
+  let snapshot;
+  try {
+    snapshot = await db
+      .collection("notifications")
+      .where("recipientUid", "==", session.uid)
+      .orderBy("createdAt", "desc")
+      .limit(50)
+      .get();
+  } catch (e: unknown) {
+    const code = (e as { code?: number }).code;
+    if (code === 9) {
+      snapshot = await db
+        .collection("notifications")
+        .where("recipientUid", "==", session.uid)
+        .limit(50)
+        .get();
+    } else {
+      throw e;
+    }
+  }
 
   const notifications = snapshot.docs.map((doc) => {
     const d = doc.data();
