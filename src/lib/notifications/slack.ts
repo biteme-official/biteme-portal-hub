@@ -32,7 +32,7 @@ async function slackApi(method: string, body: Record<string, unknown>) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${BOT_TOKEN}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
     },
     body: JSON.stringify(body),
   });
