@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Upload,
   X,
@@ -12,12 +12,18 @@ import {
 } from "lucide-react";
 import type { Attachment } from "@/lib/types/approval";
 
+export interface FileUploadHandle {
+  flushPendingLink(): Attachment[];
+}
+
 export default function FileUpload({
   files,
   onChange,
+  onPendingRef,
 }: {
   files: Attachment[];
   onChange: (files: Attachment[]) => void;
+  onPendingRef?: (ref: FileUploadHandle) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -54,14 +60,25 @@ export default function FileUpload({
   function addLink() {
     if (!linkUrl.trim()) return;
     const name = linkName.trim() || linkUrl;
-    onChange([
+    const updated = [
       ...files,
-      { kind: "link", name, url: linkUrl.trim(), size: 0, type: "link" },
-    ]);
+      { kind: "link" as const, name, url: linkUrl.trim(), size: 0, type: "link" },
+    ];
+    onChange(updated);
     setLinkUrl("");
     setLinkName("");
     setShowLinkInput(false);
+    return updated;
   }
+
+  useEffect(() => {
+    onPendingRef?.({
+      flushPendingLink() {
+        if (!linkUrl.trim()) return files;
+        return addLink() || files;
+      },
+    });
+  });
 
   function formatSize(bytes: number) {
     if (bytes === 0) return "";
@@ -138,6 +155,7 @@ export default function FileUpload({
           <input
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLink(); } }}
             placeholder="URL 입력"
             className="flex-1 h-9 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
             autoFocus

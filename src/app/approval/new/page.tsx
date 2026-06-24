@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Send, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { StampLineEditor } from "@/components/approval/StampLine";
 import ApproverPicker from "@/components/approval/ApproverPicker";
-import FileUpload from "@/components/approval/FileUpload";
+import FileUpload, { type FileUploadHandle } from "@/components/approval/FileUpload";
 import TemplatePicker from "@/components/approval/TemplatePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -36,6 +36,7 @@ export default function NewApprovalPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileUploadRef = useRef<FileUploadHandle | null>(null);
 
   async function handleSaveDraft() {
     if (!title.trim()) {
@@ -45,10 +46,11 @@ export default function NewApprovalPage() {
     setSaving(true);
     setError(null);
 
+    const finalAttachments = fileUploadRef.current?.flushPendingLink() ?? attachments;
     const res = await fetch("/api/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
+      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments: finalAttachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
     });
 
     if (res.ok) {
@@ -76,10 +78,11 @@ export default function NewApprovalPage() {
     setSubmitting(true);
     setError(null);
 
+    const finalAttachments = fileUploadRef.current?.flushPendingLink() ?? attachments;
     const createRes = await fetch("/api/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
+      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments: finalAttachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
     });
 
     if (!createRes.ok) {
@@ -314,7 +317,7 @@ export default function NewApprovalPage() {
           )}
         </div>
 
-        <FileUpload files={attachments} onChange={setAttachments} />
+        <FileUpload files={attachments} onChange={setAttachments} onPendingRef={(ref) => { fileUploadRef.current = ref; }} />
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
