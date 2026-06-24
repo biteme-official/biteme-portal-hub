@@ -143,6 +143,7 @@ export async function notifyNewUserRegistered(
   userEmail: string,
   userUid?: string
 ) {
+  console.log(`notifyNewUserRegistered called: ${userName} (${userEmail})`);
   const db = getAdminDb();
   const adminsSnap = await db
     .collection("users")
@@ -151,6 +152,7 @@ export async function notifyNewUserRegistered(
     .get();
 
   const adminUids = adminsSnap.docs.map((doc) => doc.id);
+  console.log(`notifyNewUserRegistered: found ${adminUids.length} active admins: ${adminUids.join(",")}`);
   if (adminUids.length === 0) {
     console.warn("notifyNewUserRegistered: no active admins found, skipping");
     return;

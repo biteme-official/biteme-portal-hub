@@ -77,8 +77,10 @@ export async function POST(request: Request) {
     if (!userData.isActive) {
       const isPending = !userData.lastLoginAt;
       const isArchived = !!userData.isArchived;
+      console.log(`Login blocked: ${decoded.email}, isPending=${isPending}, isArchived=${isArchived}`);
 
       if (isPending && !isArchived) {
+        console.log(`Sending new user notification for ${decoded.email}`);
         await notifyNewUserRegistered(
           userData.name || decoded.name || decoded.email!.split("@")[0],
           decoded.email!,

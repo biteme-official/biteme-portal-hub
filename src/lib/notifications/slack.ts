@@ -36,7 +36,11 @@ async function slackApi(method: string, body: Record<string, unknown>) {
     },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json();
+  if (!data.ok) {
+    console.error(`slackApi ${method} failed:`, data.error, data);
+  }
+  return data;
 }
 
 const slackIdCache = new Map<string, string | null>();
@@ -152,7 +156,12 @@ function buildUserRegisteredBlocks(body: string, targetUserUid: string, link: st
 }
 
 export async function sendSlackDm(params: SlackDmParams) {
-  if (!BOT_TOKEN) return;
+  if (!BOT_TOKEN) {
+    console.error("sendSlackDm: SLACK_BOT_TOKEN is not set, skipping");
+    return;
+  }
+  console.log(`sendSlackDm: type=${params.type}, recipients=${params.recipientEmails.join(",")}`);
+
 
   const color = TYPE_COLOR[params.type];
   const link = params.linkUrl

@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 interface User {
   uid: string;
@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -42,10 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       })
       .then((data) => {
-        if (data && !data.error) setUser(data);
+        if (data && !data.error) {
+          setUser(data);
+        } else if (pathname !== "/login") {
+          router.replace("/login");
+        }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [pathname, router]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
