@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { Bell, CheckCheck, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   NOTIFICATION_TYPE_LABELS,
@@ -32,6 +32,7 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const fetchNotifications = useCallback(async () => {
     const res = await fetch("/api/notifications");
@@ -48,15 +49,23 @@ export default function NotificationsPage() {
   }, [fetchNotifications]);
 
   async function markAsRead(ids: string[]) {
+    const unreadIds = ids.filter(
+      (id) => notifications.find((n) => n.id === id && !n.isRead)
+    );
+    if (unreadIds.length === 0) {
+      setSelectedIds(new Set());
+      return;
+    }
     await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({ ids: unreadIds }),
     });
     setNotifications((prev) =>
-      prev.map((n) => (ids.includes(n.id) ? { ...n, isRead: true } : n))
+      prev.map((n) => (unreadIds.includes(n.id) ? { ...n, isRead: true } : n))
     );
-    setUnreadCount((prev) => Math.max(0, prev - ids.length));
+    setUnreadCount((prev) => Math.max(0, prev - unreadIds.length));
+    setSelectedIds(new Set());
   }
 
   async function markAllRead() {
@@ -67,6 +76,25 @@ export default function NotificationsPage() {
     });
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const unreadInView = filtered.filter((n) => !n.isRead);
+    if (unreadInView.every((n) => selectedIds.has(n.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(unreadInView.map((n) => n.id)));
+    }
   }
 
   const filtered =
@@ -80,25 +108,41 @@ export default function NotificationsPage() {
         <div>
           <h1 className="text-xl font-bold text-text-primary">알림</h1>
           <p className="text-sm text-text-secondary mt-1">
-            읽지 않은 알림 {unreadCount}건
+            {selectedIds.size > 0
+              ? `${selectedIds.size}건 선택됨`
+              : `읽지 않은 알림 ${unreadCount}건`}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllRead}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-accent hover:bg-accent/5 rounded-lg transition-colors"
-          >
-            <CheckCheck size={14} />
-            모두 읽음 처리
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => markAsRead([...selectedIds])}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors"
+            >
+              <Check size={14} />
+              선택 읽음 처리
+            </button>
+          )}
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-accent hover:bg-accent/5 rounded-lg transition-colors"
+            >
+              <CheckCheck size={14} />
+              모두 읽음
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1 mb-4 border-b border-border">
         {(["all", "unread"] as const).map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => {
+              setFilter(f);
+              setSelectedIds(new Set());
+            }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               filter === f
                 ? "border-accent text-accent"
@@ -128,42 +172,73 @@ export default function NotificationsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-border overflow-hidden">
-          {filtered.map((n) => (
-            <Link
-              key={n.id}
-              href={getNotificationHref(n)}
-              onClick={() => {
-                if (!n.isRead) markAsRead([n.id]);
-              }}
-              className={`flex items-start gap-3 px-4 py-4 hover:bg-surface border-b border-border last:border-0 no-underline transition-colors ${
-                n.isRead ? "opacity-50" : ""
-              }`}
-            >
-              <span
-                className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${TYPE_ICON_COLOR[n.type]}`}
-              >
-                {NOTIFICATION_TYPE_LABELS[n.type][0]}
+          {filtered.some((n) => !n.isRead) && (
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-surface/50">
+              <input
+                type="checkbox"
+                checked={
+                  filtered.filter((n) => !n.isRead).length > 0 &&
+                  filtered
+                    .filter((n) => !n.isRead)
+                    .every((n) => selectedIds.has(n.id))
+                }
+                onChange={toggleSelectAll}
+                className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent cursor-pointer"
+              />
+              <span className="text-xs text-text-secondary">
+                읽지 않은 알림 전체 선택
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-text-secondary">
-                    {NOTIFICATION_TYPE_LABELS[n.type]}
-                  </span>
-                  {!n.isRead && (
-                    <span className="w-1.5 h-1.5 bg-accent rounded-full" />
-                  )}
+            </div>
+          )}
+          {filtered.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-start gap-3 px-4 py-4 hover:bg-surface border-b border-border last:border-0 transition-colors ${
+                n.isRead ? "opacity-50" : ""
+              } ${selectedIds.has(n.id) ? "bg-accent/5" : ""}`}
+            >
+              {!n.isRead && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(n.id)}
+                  onChange={() => toggleSelect(n.id)}
+                  className="w-4 h-4 mt-1 rounded border-gray-300 text-accent focus:ring-accent cursor-pointer shrink-0"
+                />
+              )}
+              {n.isRead && <div className="w-4 shrink-0" />}
+              <Link
+                href={getNotificationHref(n)}
+                onClick={() => {
+                  if (!n.isRead) markAsRead([n.id]);
+                }}
+                className="flex items-start gap-3 flex-1 min-w-0 no-underline"
+              >
+                <span
+                  className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${TYPE_ICON_COLOR[n.type]}`}
+                >
+                  {NOTIFICATION_TYPE_LABELS[n.type][0]}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-medium text-text-secondary">
+                      {NOTIFICATION_TYPE_LABELS[n.type]}
+                    </span>
+                    {!n.isRead && (
+                      <span className="w-1.5 h-1.5 bg-accent rounded-full" />
+                    )}
+                  </div>
+                  <p className="text-sm text-text-primary">{n.body}</p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {n.createdAt
+                      ? formatDistanceToNow(new Date(n.createdAt), {
+                          addSuffix: true,
+                          locale: ko,
+                        })
+                      : ""}
+                  </p>
                 </div>
-                <p className="text-sm text-text-primary">{n.body}</p>
-                <p className="text-xs text-text-secondary mt-1">
-                  {n.createdAt
-                    ? formatDistanceToNow(new Date(n.createdAt), {
-                        addSuffix: true,
-                        locale: ko,
-                      })
-                    : ""}
-                </p>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
