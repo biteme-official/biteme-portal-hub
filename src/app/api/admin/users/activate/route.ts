@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/auth/session";
+import { sendUserApprovedDm } from "@/lib/notifications/slack";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -26,6 +27,10 @@ export async function POST(request: Request) {
   }
 
   await userRef.update({ isActive: true });
+
+  sendUserApprovedDm(userData.email, userData.name).catch((e) =>
+    console.error("Approved DM error:", e)
+  );
 
   return Response.json({
     success: true,

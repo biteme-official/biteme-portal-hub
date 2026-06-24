@@ -150,7 +150,10 @@ export async function notifyNewUserRegistered(
     .get();
 
   const adminUids = adminsSnap.docs.map((doc) => doc.id);
-  if (adminUids.length === 0) return;
+  if (adminUids.length === 0) {
+    console.warn("notifyNewUserRegistered: no active admins found, skipping");
+    return;
+  }
 
   await dispatchNotification({
     recipientUids: adminUids,

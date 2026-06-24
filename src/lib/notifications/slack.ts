@@ -169,14 +169,19 @@ export async function sendSlackDm(params: SlackDmParams) {
   const results = await Promise.allSettled(
     params.recipientEmails.map(async (email) => {
       const slackId = await getSlackUserId(email);
-      if (!slackId) return;
+      if (!slackId) {
+        console.warn(`Slack DM skip: no Slack ID for ${email}`);
+        return;
+      }
       await sendDm(slackId, blocks, color);
     })
   );
 
-  const failed = results.filter((r) => r.status === "rejected").length;
-  if (failed > 0) {
-    console.error(`Slack DM: ${failed}/${results.length} failed`);
+  const failed = results.filter((r) => r.status === "rejected");
+  if (failed.length > 0) {
+    for (const r of failed) {
+      console.error(`Slack DM failed:`, (r as PromiseRejectedResult).reason);
+    }
   }
 }
 
