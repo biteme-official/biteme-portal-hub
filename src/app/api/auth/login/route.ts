@@ -80,6 +80,13 @@ export async function POST(request: Request) {
 
     if (!userData.isActive) {
       const isPending = !userData.lastLoginAt;
+
+      notifyNewUserRegistered(
+        userData.name || decoded.name || decoded.email!.split("@")[0],
+        decoded.email!,
+        decoded.uid
+      ).catch((e) => console.error("Inactive user notification error:", e));
+
       return Response.json(
         {
           error: isPending
