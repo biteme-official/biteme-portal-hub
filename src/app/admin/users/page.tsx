@@ -18,6 +18,8 @@ import {
   Pencil,
   LayoutDashboard,
   Trash2,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { getDashboards } from "@/lib/dashboards";
 
@@ -31,6 +33,7 @@ interface User {
   position: string;
   role: "admin" | "member";
   isActive: boolean;
+  isArchived?: boolean;
   dashboardAccess: Record<string, string>;
   createdAt: string | null;
   lastLoginAt: string | null;
@@ -80,7 +83,7 @@ export default function AdminUsersPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set()
   );
-  const [tab, setTab] = useState<"active" | "inactive">("active");
+  const [tab, setTab] = useState<"active" | "inactive" | "archived">("active");
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -113,6 +116,15 @@ export default function AdminUsersPage() {
     fetchUsers();
   }
 
+  async function archiveUser(uid: string, archive: boolean) {
+    await fetch("/api/admin/users/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, archive }),
+    });
+    fetchUsers();
+  }
+
   async function toggleRole(uid: string, role: string) {
     await fetch("/api/admin/users", {
       method: "PATCH",
@@ -135,9 +147,11 @@ export default function AdminUsersPage() {
   }
 
   const filteredUsers = useMemo(() => {
-    const byTab = users.filter((u) =>
-      tab === "active" ? u.isActive : !u.isActive
-    );
+    const byTab = users.filter((u) => {
+      if (tab === "active") return u.isActive;
+      if (tab === "archived") return !!u.isArchived;
+      return !u.isActive && !u.isArchived;
+    });
     if (!searchQuery.trim()) return byTab;
     const q = searchQuery.toLowerCase();
     return byTab.filter(
@@ -201,7 +215,8 @@ export default function AdminUsersPage() {
   }
 
   const activeCount = users.filter((u) => u.isActive).length;
-  const inactiveCount = users.filter((u) => !u.isActive).length;
+  const archivedCount = users.filter((u) => !!u.isArchived).length;
+  const inactiveCount = users.filter((u) => !u.isActive && !u.isArchived).length;
 
   function formatOrg(u: User) {
     const div = u.division || getUserDivision(u);
@@ -230,48 +245,35 @@ export default function AdminUsersPage() {
         </button>
       </div>
 
-      {/* Active / Inactive Tabs */}
+      {/* Active / Inactive / Archived Tabs */}
       <div className="flex items-center gap-1 mb-4 border-b border-border">
-        <button
-          onClick={() => setTab("active")}
-          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            tab === "active"
-              ? "border-accent text-accent"
-              : "border-transparent text-text-secondary hover:text-text-primary"
-          }`}
-        >
-          <UserCheck size={14} />
-          활성 사용자
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded-full ${
-              tab === "active"
-                ? "bg-accent/10 text-accent"
-                : "bg-gray-100 text-gray-500"
+        {([
+          { key: "active" as const, label: "활성 사용자", icon: UserCheck, count: activeCount },
+          { key: "inactive" as const, label: "비활성화", icon: UserX, count: inactiveCount },
+          { key: "archived" as const, label: "보관", icon: Archive, count: archivedCount },
+        ]).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.key
+                ? "border-accent text-accent"
+                : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
-            {activeCount}
-          </span>
-        </button>
-        <button
-          onClick={() => setTab("inactive")}
-          className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            tab === "inactive"
-              ? "border-accent text-accent"
-              : "border-transparent text-text-secondary hover:text-text-primary"
-          }`}
-        >
-          <UserX size={14} />
-          비활성화
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded-full ${
-              tab === "inactive"
-                ? "bg-accent/10 text-accent"
-                : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {inactiveCount}
-          </span>
-        </button>
+            <t.icon size={14} />
+            {t.label}
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                tab === t.key
+                  ? "bg-accent/10 text-accent"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {t.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Search + View Mode */}
@@ -476,38 +478,63 @@ export default function AdminUsersPage() {
                                 </button>
                                 {u.uid !== currentUser?.uid && (
                                   <>
-                                    <button
-                                      onClick={() =>
-                                        toggleRole(u.uid, u.role)
-                                      }
-                                      className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
-                                      title={
-                                        u.role === "admin"
-                                          ? "멤버로 변경"
-                                          : "관리자로 변경"
-                                      }
-                                    >
-                                      {u.role === "admin" ? (
-                                        <Shield size={14} />
-                                      ) : (
-                                        <ShieldCheck size={14} />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        toggleActive(u.uid, u.isActive)
-                                      }
-                                      className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
-                                      title={
-                                        u.isActive ? "비활성화" : "활성화"
-                                      }
-                                    >
-                                      {u.isActive ? (
-                                        <UserX size={14} />
-                                      ) : (
-                                        <UserCheck size={14} />
-                                      )}
-                                    </button>
+                                    {tab !== "archived" && (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            toggleRole(u.uid, u.role)
+                                          }
+                                          className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
+                                          title={
+                                            u.role === "admin"
+                                              ? "멤버로 변경"
+                                              : "관리자로 변경"
+                                          }
+                                        >
+                                          {u.role === "admin" ? (
+                                            <Shield size={14} />
+                                          ) : (
+                                            <ShieldCheck size={14} />
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            toggleActive(u.uid, u.isActive)
+                                          }
+                                          className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
+                                          title={
+                                            u.isActive ? "비활성화" : "활성화"
+                                          }
+                                        >
+                                          {u.isActive ? (
+                                            <UserX size={14} />
+                                          ) : (
+                                            <UserCheck size={14} />
+                                          )}
+                                        </button>
+                                      </>
+                                    )}
+                                    {tab === "archived" ? (
+                                      <button
+                                        onClick={() =>
+                                          archiveUser(u.uid, false)
+                                        }
+                                        className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
+                                        title="보관 해제"
+                                      >
+                                        <ArchiveRestore size={14} />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          archiveUser(u.uid, true)
+                                        }
+                                        className="p-1.5 rounded-md hover:bg-amber-50 text-text-secondary hover:text-amber-600 transition-colors"
+                                        title="보관 (퇴사자)"
+                                      >
+                                        <Archive size={14} />
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() =>
                                         deleteUser(u.uid, u.name)

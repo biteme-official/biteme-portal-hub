@@ -68,11 +68,7 @@ export async function POST(request: Request) {
         });
         userDoc = await userRef.get();
 
-        if (!isFirstUser) {
-          await notifyNewUserRegistered(newUserName, decoded.email!, decoded.uid).catch((e) =>
-            console.error("New user notification error:", e)
-          );
-        }
+        // Notification is handled in the !isActive block below with proper guards
       }
     }
 
@@ -80,18 +76,23 @@ export async function POST(request: Request) {
 
     if (!userData.isActive) {
       const isPending = !userData.lastLoginAt;
+      const isArchived = !!userData.isArchived;
 
-      await notifyNewUserRegistered(
-        userData.name || decoded.name || decoded.email!.split("@")[0],
-        decoded.email!,
-        decoded.uid
-      ).catch((e) => console.error("Inactive user notification error:", e));
+      if (isPending && !isArchived) {
+        await notifyNewUserRegistered(
+          userData.name || decoded.name || decoded.email!.split("@")[0],
+          decoded.email!,
+          decoded.uid
+        ).catch((e) => console.error("Inactive user notification error:", e));
+      }
 
       return Response.json(
         {
-          error: isPending
-            ? "관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다."
-            : "비활성화된 계정입니다. 관리자에게 문의하세요.",
+          error: isArchived
+            ? "보관된 계정입니다. 관리자에게 문의하세요."
+            : isPending
+              ? "관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다."
+              : "비활성화된 계정입니다. 관리자에게 문의하세요.",
           pending: isPending,
         },
         { status: 403 }
