@@ -40,7 +40,7 @@ export async function POST(
       recipientUids.delete(session.uid);
 
       if (recipientUids.size > 0) {
-        notifyComment(
+        await notifyComment(
           id,
           approval.title,
           session.name,

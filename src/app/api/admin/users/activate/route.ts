@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   await userRef.update({ isActive: true });
 
-  sendUserApprovedDm(userData.email, userData.name).catch((e) =>
+  await sendUserApprovedDm(userData.email, userData.name).catch((e) =>
     console.error("Approved DM error:", e)
   );
 

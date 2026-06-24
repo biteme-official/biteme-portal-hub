@@ -17,7 +17,7 @@ export async function POST(
     if (approval) {
       const approverUids = approval.approvalLine.map((s) => s.approver.uid);
       const ccUids = approval.ccList.map((c) => c.uid);
-      notifyApprovalSubmitted(
+      await notifyApprovalSubmitted(
         id,
         approval.title,
         session.name,

@@ -30,7 +30,7 @@ export async function POST(
 
     const approval = await getApproval(id);
     if (approval) {
-      notifyApprovalDecided(
+      await notifyApprovalDecided(
         id,
         approval.title,
         session.name,

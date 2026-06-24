@@ -19,7 +19,7 @@ export async function POST(
     if (approval) {
       const approverUids = approval.approvalLine.map((s) => s.approver.uid);
       const ccUids = approval.ccList.map((c) => c.uid);
-      notifyApprovalCanceled(
+      await notifyApprovalCanceled(
         id,
         approval.title,
         session.name,

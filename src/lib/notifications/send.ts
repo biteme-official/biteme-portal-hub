@@ -51,19 +51,20 @@ export async function dispatchNotification(params: NotifyParams) {
 
   await batch.commit();
 
-  getEmailsByUids(params.recipientUids)
-    .then((emails) =>
-      sendSlackDm({
-        recipientEmails: emails,
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        approvalId: params.approvalId,
-        linkUrl: params.linkUrl,
-        targetUserUid: params.targetUserUid,
-      })
-    )
-    .catch((e) => console.error("Slack DM error:", e));
+  try {
+    const emails = await getEmailsByUids(params.recipientUids);
+    await sendSlackDm({
+      recipientEmails: emails,
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      approvalId: params.approvalId,
+      linkUrl: params.linkUrl,
+      targetUserUid: params.targetUserUid,
+    });
+  } catch (e) {
+    console.error("Slack DM error:", e);
+  }
 }
 
 export async function notifyApprovalSubmitted(

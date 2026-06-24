@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         userDoc = await userRef.get();
 
         if (!isFirstUser) {
-          notifyNewUserRegistered(newUserName, decoded.email!, decoded.uid).catch((e) =>
+          await notifyNewUserRegistered(newUserName, decoded.email!, decoded.uid).catch((e) =>
             console.error("New user notification error:", e)
           );
         }
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     if (!userData.isActive) {
       const isPending = !userData.lastLoginAt;
 
-      notifyNewUserRegistered(
+      await notifyNewUserRegistered(
         userData.name || decoded.name || decoded.email!.split("@")[0],
         decoded.email!,
         decoded.uid
