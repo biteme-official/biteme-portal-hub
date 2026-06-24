@@ -1,4 +1,5 @@
-import { getSession } from "@/lib/auth/session";
+import { getSession, deleteSession } from "@/lib/auth/session";
+import { getAdminDb } from "@/lib/firebase/admin";
 
 export async function GET() {
   const session = await getSession();
@@ -7,11 +8,20 @@ export async function GET() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const db = getAdminDb();
+  const userDoc = await db.collection("users").doc(session.uid).get();
+
+  if (!userDoc.exists || !userDoc.data()?.isActive) {
+    await deleteSession();
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userData = userDoc.data()!;
   return Response.json({
     uid: session.uid,
     email: session.email,
-    name: session.name,
-    photoURL: session.photoURL,
-    role: session.role,
+    name: userData.name || session.name,
+    photoURL: userData.photoURL || session.photoURL,
+    role: userData.role || session.role,
   });
 }
