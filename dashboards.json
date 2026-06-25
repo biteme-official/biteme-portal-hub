@@ -25,12 +25,12 @@
       "name": "스마트스토어",
       "description": "바잇미 스마트스토어 매출/유입 분석 대시보드",
       "category": "d2c",
-      "path": "https://escapable-annuity-cure.ngrok-free.dev",
+      "path": "https://biteme-smartstore-dashboard.vercel.app",
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
       "tags": ["스마트스토어", "매출", "실시간"],
-      "github": "https://github.com/bmahsang/biteme-smartstore-dashboard"
+      "github": "https://github.com/biteme-official/biteme-smartstore-dashboard"
     },
     {
       "slug": "b2b-kr-dashboard",
