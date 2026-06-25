@@ -49,7 +49,7 @@
       "name": "프로덕트 대시보드",
       "description": "바잇미 프로덕트 현황 대시보드",
       "category": "product",
-      "path": "https://md-dashboard-one.vercel.app",
+      "path": "https://product-dashboard-delta-taupe.vercel.app",
       "type": "external",
       "status": "active",
       "owner": "전략기획팀",
