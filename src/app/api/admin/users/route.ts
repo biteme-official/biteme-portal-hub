@@ -93,7 +93,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const allowed = ["name", "division", "department", "position", "role", "isActive", "dashboardAccess"];
+  const allowed = ["name", "division", "department", "position", "role", "isActive", "dashboardAccess", "slackUserId"];
   const filtered: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in updates) filtered[key] = updates[key];

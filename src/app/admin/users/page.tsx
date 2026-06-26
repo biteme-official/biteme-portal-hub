@@ -34,6 +34,7 @@ interface User {
   role: "admin" | "member";
   isActive: boolean;
   isArchived?: boolean;
+  slackUserId?: string;
   dashboardAccess: Record<string, string>;
   createdAt: string | null;
   lastLoginAt: string | null;
@@ -602,6 +603,7 @@ function UserFormModal({
   const [department, setDepartment] = useState(user?.department || "");
   const [position, setPosition] = useState(user?.position || "");
   const [role, setRole] = useState<"member" | "admin">(user?.role || "member");
+  const [slackUserId, setSlackUserId] = useState(user?.slackUserId || "");
   const [dashboardAccess, setDashboardAccess] = useState<
     Record<string, string>
   >(user?.dashboardAccess || {});
@@ -639,6 +641,7 @@ function UserFormModal({
           department,
           position,
           role,
+          slackUserId: slackUserId || null,
           dashboardAccess,
         }),
       });
@@ -781,6 +784,22 @@ function UserFormModal({
                 <option value="admin">관리자</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              Slack ID
+            </label>
+            <input
+              type="text"
+              value={slackUserId}
+              onChange={(e) => setSlackUserId(e.target.value.trim())}
+              placeholder="U0XXXXXXXXX"
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent font-mono"
+            />
+            <p className="text-xs text-text-secondary mt-1">
+              Slack 프로필 &gt; 더보기(⋯) &gt; 멤버 ID 복사
+            </p>
           </div>
 
           {roleDashboards.length > 0 && (
