@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   UserPlus,
@@ -69,6 +69,31 @@ function sortByPosition(users: User[]): User[] {
     (a, b) =>
       (POSITION_RANK[a.position] ?? 99) - (POSITION_RANK[b.position] ?? 99)
   );
+}
+
+function groupByTeam(users: User[], divisionTeams: string[]): [string, User[]][] {
+  const noTeam: User[] = [];
+  const teamMap = new Map<string, User[]>();
+
+  for (const u of users) {
+    if (u.department && divisionTeams.includes(u.department)) {
+      const list = teamMap.get(u.department) || [];
+      list.push(u);
+      teamMap.set(u.department, list);
+    } else {
+      noTeam.push(u);
+    }
+  }
+
+  const result: [string, User[]][] = [];
+  if (noTeam.length > 0) result.push(["", sortByPosition(noTeam)]);
+  for (const team of divisionTeams) {
+    const members = teamMap.get(team);
+    if (members && members.length > 0) {
+      result.push([team, sortByPosition(members)]);
+    }
+  }
+  return result;
 }
 
 export default function AdminUsersPage() {
@@ -403,8 +428,24 @@ export default function AdminUsersPage() {
                             소속 인원이 없습니다
                           </td>
                         </tr>
-                      ) : (
-                        groupUsers.map((u) => (
+                      ) : (() => {
+                        const teamList = viewMode === "division" && teams
+                          ? groupByTeam(groupUsers, teams)
+                          : [["", groupUsers] as [string, User[]]];
+                        return teamList.map(([team, members]) => (
+                          <Fragment key={team || "_direct"}>
+                            {team && (
+                              <tr className="bg-accent/5 border-b border-border">
+                                <td colSpan={6} className="px-6 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <Users size={12} className="text-accent/60" />
+                                    <span className="text-xs font-semibold text-text-primary">{team}</span>
+                                    <span className="text-[10px] text-text-secondary bg-white px-1.5 py-0.5 rounded-full">{members.length}명</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            {members.map((u) => (
                           <tr
                             key={u.uid}
                             className="border-b border-border last:border-0 hover:bg-surface/30"
@@ -550,8 +591,10 @@ export default function AdminUsersPage() {
                               </div>
                             </td>
                           </tr>
-                        ))
-                      )}
+                            ))}
+                          </Fragment>
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 )}
