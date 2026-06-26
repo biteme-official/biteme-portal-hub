@@ -26,16 +26,29 @@ const TYPE_COLOR: Record<NotificationType, string> = {
   user_registered: "#8b5cf6",
 };
 
+const SLACK_GET_METHODS = new Set(["users.lookupByEmail", "users.info"]);
+
 async function slackApi(method: string, body: Record<string, unknown>) {
   if (!BOT_TOKEN) return null;
-  const res = await fetch(`https://slack.com/api/${method}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${BOT_TOKEN}`,
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify(body),
-  });
+
+  let res: Response;
+  if (SLACK_GET_METHODS.has(method)) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(body)) params.set(k, String(v));
+    res = await fetch(`https://slack.com/api/${method}?${params}`, {
+      headers: { Authorization: `Bearer ${BOT_TOKEN}` },
+    });
+  } else {
+    res = await fetch(`https://slack.com/api/${method}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${BOT_TOKEN}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
   const data = await res.json();
   if (!data.ok) {
     console.error(`slackApi ${method} failed:`, data.error, data);
@@ -64,10 +77,12 @@ async function getSlackUserId(email: string): Promise<string | null> {
 
   const result = await slackApi("users.lookupByEmail", { email });
   const slackId = result?.ok ? result.user?.id : null;
-  slackIdCache.set(email, slackId);
 
-  if (slackId && !snap.empty) {
-    snap.docs[0].ref.update({ slackUserId: slackId }).catch(() => {});
+  if (slackId) {
+    slackIdCache.set(email, slackId);
+    if (!snap.empty) {
+      snap.docs[0].ref.update({ slackUserId: slackId }).catch(() => {});
+    }
   }
 
   return slackId;
