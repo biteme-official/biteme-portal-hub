@@ -16,6 +16,7 @@ interface User {
   name: string;
   photoURL: string | null;
   role: "admin" | "member";
+  position: string;
 }
 
 interface AuthContextValue {

@@ -23,5 +23,6 @@ export async function GET() {
     name: userData.name || session.name,
     photoURL: userData.photoURL || session.photoURL,
     role: userData.role || session.role,
+    position: userData.position || "",
   });
 }

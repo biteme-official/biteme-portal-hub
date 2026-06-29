@@ -18,6 +18,7 @@ export interface Dashboard {
   github?: string;
   roles?: string[];
   roleLabels?: Record<string, string>;
+  visiblePositions?: string[];
 }
 
 export interface DashboardConfig {

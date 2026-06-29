@@ -76,6 +76,19 @@
       "owner": "전략기획팀",
       "tags": ["ROI", "Tableau", "전사"],
       "github": "https://github.com/biteme-official/biteme-roi-dashboard"
+    },
+    {
+      "slug": "weekly-consulting-review",
+      "name": "주간컨설팅 리뷰",
+      "description": "바잇미 주간 컨설팅 리뷰 (Tableau 연동, 팀별 액션/공헌이익 분석)",
+      "category": "strategy",
+      "path": "https://biteme-weekly-review.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["주간리뷰", "공헌이익", "Tableau"],
+      "github": "https://github.com/bmahsang/biteme-weekly-review",
+      "visiblePositions": ["팀장", "본부장"]
     }
   ]
 }
