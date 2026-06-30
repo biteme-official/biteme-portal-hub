@@ -7,7 +7,7 @@ const SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET || "";
 const DIVISIONS: Record<string, string[]> = {
   "CEO 직속": ["전략기획팀", "MKT팀", "해외팀"],
   "COO 본부": ["경영지원팀", "플랫폼팀", "브랜드팀", "CS팀"],
-  "CPO 본부": ["상품기획팀", "패션팀", "디자인팀"],
+  "CPO 본부": ["상품기획팀", "패션팀", "디자인팀", "개발팀"],
 };
 
 const DIVISION_OPTIONS = Object.keys(DIVISIONS).map((d) => ({
