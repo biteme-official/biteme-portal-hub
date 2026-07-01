@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Tag,
   Target,
+  Globe,
   MoreHorizontal,
   Archive,
   Home,
@@ -33,6 +34,7 @@ const iconMap: Record<string, LucideIcon> = {
   TrendingUp,
   Tag,
   Target,
+  Globe,
   MoreHorizontal,
 };
 

@@ -9,6 +9,7 @@ const categoryColors: Record<string, string> = {
   revenue: "bg-purple-100 text-purple-700",
   "sku-pricing": "bg-amber-100 text-amber-700",
   strategy: "bg-rose-100 text-rose-700",
+  global: "bg-cyan-100 text-cyan-700",
   etc: "bg-gray-100 text-gray-600",
 };
 

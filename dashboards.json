@@ -5,7 +5,8 @@
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
     { "id": "sku-pricing", "label": "SKU/프라이싱", "icon": "Tag", "order": 4 },
     { "id": "strategy", "label": "전략/계획", "icon": "Target", "order": 5 },
-    { "id": "etc", "label": "기타", "icon": "MoreHorizontal", "order": 6 }
+    { "id": "global", "label": "글로벌", "icon": "Globe", "order": 6 },
+    { "id": "etc", "label": "기타", "icon": "MoreHorizontal", "order": 7 }
   ],
   "dashboards": [
     {
@@ -89,6 +90,30 @@
       "tags": ["주간리뷰", "공헌이익", "Tableau"],
       "github": "https://github.com/bmahsang/biteme-weekly-review",
       "visiblePositions": ["팀장", "본부장"]
+    },
+    {
+      "slug": "global-kr",
+      "name": "국내 글로벌",
+      "description": "바잇미 국내 글로벌 대시보드",
+      "category": "global",
+      "path": "https://global-marketing-retro.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["글로벌", "국내"],
+      "github": "https://github.com/biteme-official/global-marketing-retro"
+    },
+    {
+      "slug": "japan-incare",
+      "name": "일본 인케어",
+      "description": "바잇미 일본 인케어 대시보드",
+      "category": "global",
+      "path": "https://japan-mall-retro.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["글로벌", "일본", "인케어"],
+      "github": "https://github.com/biteme-official/japan-mall-retro"
     }
   ]
 }
