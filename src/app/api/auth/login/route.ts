@@ -6,24 +6,100 @@ import { notifyNewUserRegistered } from "@/lib/notifications/send";
 
 const COOKIE_NAME = "session";
 
+async function verifyCredentialLogin(
+  email: string,
+  password: string,
+  apiKey: string
+): Promise<{ uid: string; email: string }> {
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    const code = err?.error?.message || "";
+    console.error("Firebase auth error:", JSON.stringify(err));
+    if (code === "EMAIL_NOT_FOUND" || code === "INVALID_LOGIN_CREDENTIALS") {
+      throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
+    }
+    if (code === "TOO_MANY_ATTEMPTS_TRY_LATER") {
+      throw new Error(
+        "로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요."
+      );
+    }
+    if (
+      code === "ADMIN_ONLY_OPERATION" ||
+      code === "PASSWORD_LOGIN_DISABLED" ||
+      code.includes("CONFIGURATION_NOT_FOUND")
+    ) {
+      throw new Error("이메일/비밀번호 로그인이 활성화되지 않았습니다. Firebase Console에서 활성화하세요.");
+    }
+    throw new Error("인증에 실패했습니다.");
+  }
+
+  const data = await res.json();
+  return { uid: data.localId, email: data.email };
+}
+
 export async function POST(request: Request) {
   try {
-    const { idToken } = await request.json();
+    const body = await request.json();
+    const { idToken, loginId, password } = body;
 
-    if (!idToken) {
-      return Response.json({ error: "ID 토큰이 필요합니다." }, { status: 400 });
+    if (!idToken && (!loginId || !password)) {
+      return Response.json(
+        { error: "인증 정보가 필요합니다." },
+        { status: 400 }
+      );
     }
+
+    const credEmail = loginId
+      ? `${loginId}@credential.biteme.co.kr`
+      : undefined;
 
     const adminAuth = getAdminAuth();
     const adminDb = getAdminDb();
 
-    const decoded = await adminAuth.verifyIdToken(idToken);
+    let decoded: { uid: string; email?: string; name?: string; picture?: string };
+    let isCredentialLogin = false;
 
-    if (!decoded.email?.endsWith("@biteme.co.kr")) {
-      return Response.json(
-        { error: "바잇미 계정(@biteme.co.kr)만 이용 가능합니다." },
-        { status: 403 }
-      );
+    if (idToken) {
+      decoded = await adminAuth.verifyIdToken(idToken);
+
+      if (!decoded.email?.endsWith("@biteme.co.kr")) {
+        return Response.json(
+          { error: "바잇미 계정(@biteme.co.kr)만 이용 가능합니다." },
+          { status: 403 }
+        );
+      }
+    } else {
+      const apiKey =
+        process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+        "AIzaSyBRU_YtrDVWEF4TvckKadj4B9wa33ak3K4";
+
+      const result = await verifyCredentialLogin(credEmail!, password, apiKey);
+      decoded = { uid: result.uid, email: result.email };
+      isCredentialLogin = true;
+
+      const userDoc = await adminDb
+        .collection("users")
+        .doc(decoded.uid)
+        .get();
+      if (!userDoc.exists || userDoc.data()?.authType !== "credential") {
+        return Response.json(
+          { error: "예외 로그인 계정이 아닙니다. 구글 로그인을 이용하세요." },
+          { status: 403 }
+        );
+      }
     }
 
     let userRef = adminDb.collection("users").doc(decoded.uid);
@@ -130,9 +206,17 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Login error:", message, err);
+
+    const isUserFacing =
+      message.includes("비밀번호") ||
+      message.includes("아이디") ||
+      message.includes("시도가 너무") ||
+      message.includes("예외 로그인") ||
+      message.includes("활성화");
+
     return Response.json(
-      { error: "인증에 실패했습니다.", detail: message },
-      { status: 500 }
+      { error: isUserFacing ? message : "인증에 실패했습니다." },
+      { status: isUserFacing ? 401 : 500 }
     );
   }
 }

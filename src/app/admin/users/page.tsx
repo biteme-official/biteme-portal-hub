@@ -20,6 +20,12 @@ import {
   Trash2,
   Archive,
   ArchiveRestore,
+  KeyRound,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
 } from "lucide-react";
 import { getDashboards } from "@/lib/dashboards";
 
@@ -34,6 +40,8 @@ interface User {
   role: "admin" | "member";
   isActive: boolean;
   isArchived?: boolean;
+  authType?: "credential";
+  loginId?: string;
   slackUserId?: string;
   dashboardAccess: Record<string, string>;
   createdAt: string | null;
@@ -42,7 +50,7 @@ interface User {
 
 const DIVISIONS: Record<string, string[]> = {
   "CEO 직속": ["전략기획팀", "MKT팀", "해외팀"],
-  "COO 본부": ["경영지원팀", "플랫폼팀", "브랜드팀", "CS팀"],
+  "COO 본부": ["경영지원팀", "플랫폼팀", "브랜드팀", "CS팀", "오프라인팀"],
   "CPO 본부": ["상품기획팀", "패션팀", "디자인팀", "개발팀"],
 };
 
@@ -109,7 +117,7 @@ export default function AdminUsersPage() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set()
   );
-  const [tab, setTab] = useState<"active" | "inactive" | "archived">("active");
+  const [tab, setTab] = useState<"active" | "inactive" | "archived" | "credential">("active");
 
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -141,6 +149,9 @@ export default function AdminUsersPage() {
     });
     fetchUsers();
   }
+
+  const [showCredentialModal, setShowCredentialModal] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
 
   async function archiveUser(uid: string, archive: boolean) {
     await fetch("/api/admin/users/archive", {
@@ -174,9 +185,10 @@ export default function AdminUsersPage() {
 
   const filteredUsers = useMemo(() => {
     const byTab = users.filter((u) => {
-      if (tab === "active") return u.isActive;
-      if (tab === "archived") return !!u.isArchived;
-      return !u.isActive && !u.isArchived;
+      if (tab === "credential") return u.authType === "credential";
+      if (tab === "active") return u.isActive && u.authType !== "credential";
+      if (tab === "archived") return !!u.isArchived && u.authType !== "credential";
+      return !u.isActive && !u.isArchived && u.authType !== "credential";
     });
     if (!searchQuery.trim()) return byTab;
     const q = searchQuery.toLowerCase();
@@ -240,9 +252,10 @@ export default function AdminUsersPage() {
     );
   }
 
-  const activeCount = users.filter((u) => u.isActive).length;
-  const archivedCount = users.filter((u) => !!u.isArchived).length;
-  const inactiveCount = users.filter((u) => !u.isActive && !u.isArchived).length;
+  const credentialCount = users.filter((u) => u.authType === "credential").length;
+  const activeCount = users.filter((u) => u.isActive && u.authType !== "credential").length;
+  const archivedCount = users.filter((u) => !!u.isArchived && u.authType !== "credential").length;
+  const inactiveCount = users.filter((u) => !u.isActive && !u.isArchived && u.authType !== "credential").length;
 
   function formatOrg(u: User) {
     const div = u.division || getUserDivision(u);
@@ -263,20 +276,21 @@ export default function AdminUsersPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => tab === "credential" ? setShowCredentialModal(true) : setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
         >
-          <UserPlus size={16} />
-          사용자 추가
+          {tab === "credential" ? <KeyRound size={16} /> : <UserPlus size={16} />}
+          {tab === "credential" ? "예외 사용자 추가" : "사용자 추가"}
         </button>
       </div>
 
-      {/* Active / Inactive / Archived Tabs */}
-      <div className="flex items-center gap-1 mb-4 border-b border-border">
+      {/* Active / Inactive / Archived / Credential Tabs */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border overflow-x-auto">
         {([
           { key: "active" as const, label: "활성 사용자", icon: UserCheck, count: activeCount },
           { key: "inactive" as const, label: "비활성화", icon: UserX, count: inactiveCount },
           { key: "archived" as const, label: "보관", icon: Archive, count: archivedCount },
+          { key: "credential" as const, label: "예외 로그인", icon: KeyRound, count: credentialCount },
         ]).map((t) => (
           <button
             key={t.key}
@@ -469,7 +483,9 @@ export default function AdminUsersPage() {
                                     {u.name}
                                   </p>
                                   <p className="text-xs text-text-secondary">
-                                    {u.email}
+                                    {u.authType === "credential" && u.loginId
+                                      ? `ID: ${u.loginId}`
+                                      : u.email}
                                   </p>
                                 </div>
                               </div>
@@ -518,9 +534,18 @@ export default function AdminUsersPage() {
                                 >
                                   <Pencil size={14} />
                                 </button>
+                                {u.authType === "credential" && (
+                                  <button
+                                    onClick={() => setResetPasswordUser(u)}
+                                    className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
+                                    title="비밀번호 초기화"
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                )}
                                 {u.uid !== currentUser?.uid && (
                                   <>
-                                    {tab !== "archived" && (
+                                    {tab !== "archived" && tab !== "credential" && (
                                       <>
                                         <button
                                           onClick={() =>
@@ -556,7 +581,23 @@ export default function AdminUsersPage() {
                                         </button>
                                       </>
                                     )}
-                                    {tab === "archived" ? (
+                                    {tab === "credential" ? (
+                                      <button
+                                        onClick={() =>
+                                          toggleActive(u.uid, u.isActive)
+                                        }
+                                        className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-accent transition-colors"
+                                        title={
+                                          u.isActive ? "비활성화" : "활성화"
+                                        }
+                                      >
+                                        {u.isActive ? (
+                                          <UserX size={14} />
+                                        ) : (
+                                          <UserCheck size={14} />
+                                        )}
+                                      </button>
+                                    ) : tab === "archived" ? (
                                       <button
                                         onClick={() =>
                                           archiveUser(u.uid, false)
@@ -622,6 +663,23 @@ export default function AdminUsersPage() {
             setEditingUser(null);
             fetchUsers();
           }}
+        />
+      )}
+
+      {showCredentialModal && (
+        <CredentialUserModal
+          onClose={() => setShowCredentialModal(false)}
+          onSaved={() => {
+            setShowCredentialModal(false);
+            fetchUsers();
+          }}
+        />
+      )}
+
+      {resetPasswordUser && (
+        <ResetPasswordModal
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
         />
       )}
     </div>
@@ -948,6 +1006,422 @@ function UserFormModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function CredentialUserModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [division, setDivision] = useState("");
+  const [department, setDepartment] = useState("");
+  const [position, setPosition] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const availableTeams = division ? DIVISIONS[division] || [] : [];
+
+  function generatePassword() {
+    const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let result = "";
+    for (let i = 0; i < 10; i++) {
+      result += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setPassword(result);
+  }
+
+  async function handleCopy() {
+    if (!password) return;
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    const res = await fetch("/api/admin/users/credential", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        loginId,
+        password,
+        name,
+        division,
+        department,
+        position,
+        role: "member",
+      }),
+    });
+
+    if (res.ok) {
+      onSaved();
+    } else {
+      const data = await res.json();
+      setError(data.error || "생성에 실패했습니다.");
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <KeyRound size={18} className="text-accent" />
+            <h2 className="text-lg font-bold text-text-primary">
+              예외 로그인 사용자 추가
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-text-secondary hover:text-text-primary"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              아이디 *
+            </label>
+            <input
+              type="text"
+              required
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value.replace(/\s/g, ""))}
+              placeholder="test1"
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm font-mono focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              비밀번호 *
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="6자 이상"
+                  className="w-full h-10 px-3 pr-16 rounded-lg border border-border bg-surface text-sm font-mono focus:outline-none focus:border-accent"
+                />
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1.5 rounded hover:bg-gray-100 text-text-secondary"
+                    title={showPassword ? "숨기기" : "보기"}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  {password && (
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="p-1.5 rounded hover:bg-gray-100 text-text-secondary"
+                      title="복사"
+                    >
+                      {copied ? (
+                        <Check size={14} className="text-green-500" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={generatePassword}
+                className="h-10 px-3 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface transition-colors whitespace-nowrap"
+              >
+                자동 생성
+              </button>
+            </div>
+            <p className="text-xs text-text-secondary mt-1">
+              생성 후 비밀번호를 대상자에게 전달하세요
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              이름
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="홍길동"
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">
+                본부
+              </label>
+              <select
+                value={division}
+                onChange={(e) => {
+                  setDivision(e.target.value);
+                  if (e.target.value && department) {
+                    const teams = DIVISIONS[e.target.value] || [];
+                    if (!teams.includes(department)) setDepartment("");
+                  }
+                }}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+              >
+                <option value="">선택</option>
+                {DIVISION_NAMES.map((div) => (
+                  <option key={div} value={div}>
+                    {div}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">
+                팀
+              </label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                disabled={!division}
+                className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent disabled:opacity-50"
+              >
+                <option value="">없음</option>
+                {availableTeams.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1">
+              직책
+            </label>
+            <select
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-accent"
+            >
+              <option value="">선택</option>
+              {POSITIONS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-10 rounded-lg border border-border text-sm text-text-secondary hover:bg-surface transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 h-10 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {submitting ? (
+                <Loader2 size={16} className="animate-spin mx-auto" />
+              ) : (
+                "등록"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  onClose,
+}: {
+  user: User;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function generatePassword() {
+    const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let result = "";
+    for (let i = 0; i < 10; i++) {
+      result += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setPassword(result);
+  }
+
+  async function handleCopy() {
+    if (!password) return;
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    const res = await fetch("/api/admin/users/credential", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: user.uid, password }),
+    });
+
+    if (res.ok) {
+      setSuccess(true);
+    } else {
+      const data = await res.json();
+      setError(data.error || "변경에 실패했습니다.");
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-text-primary">비밀번호 초기화</h2>
+          <button
+            onClick={onClose}
+            className="text-text-secondary hover:text-text-primary"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="text-sm text-text-secondary mb-4">
+          <span className="font-medium text-text-primary">{user.name}</span>{" "}
+          ({user.email})
+        </p>
+
+        {success ? (
+          <div className="space-y-4">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">
+                비밀번호가 변경되었습니다. 새 비밀번호를 대상자에게 전달하세요.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 p-3 bg-surface rounded-lg">
+              <code className="flex-1 text-sm font-mono">{password}</code>
+              <button
+                onClick={handleCopy}
+                className="p-1.5 rounded hover:bg-gray-200 text-text-secondary"
+              >
+                {copied ? (
+                  <Check size={14} className="text-green-500" />
+                ) : (
+                  <Copy size={14} />
+                )}
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full h-10 rounded-lg border border-border text-sm text-text-secondary hover:bg-surface transition-colors"
+            >
+              닫기
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">
+                새 비밀번호
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="6자 이상"
+                    className="w-full h-10 px-3 pr-10 rounded-lg border border-border bg-surface text-sm font-mono focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100 text-text-secondary"
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={generatePassword}
+                  className="h-10 px-3 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface transition-colors whitespace-nowrap"
+                >
+                  자동 생성
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 h-10 rounded-lg border border-border text-sm text-text-secondary hover:bg-surface transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 h-10 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+              >
+                {submitting ? (
+                  <Loader2 size={16} className="animate-spin mx-auto" />
+                ) : (
+                  "변경"
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
