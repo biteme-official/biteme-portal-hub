@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     const credEmail = loginId
-      ? `${loginId}@credential.biteme.co.kr`
+      ? loginId.includes("@") ? loginId : `${loginId}@credential.biteme.co.kr`
       : undefined;
 
     const adminAuth = getAdminAuth();

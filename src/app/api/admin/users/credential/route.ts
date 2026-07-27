@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const email = `${loginId}${CREDENTIAL_DOMAIN}`;
+  const email = loginId.includes("@") ? loginId : `${loginId}${CREDENTIAL_DOMAIN}`;
   const db = getAdminDb();
   const auth = getAdminAuth();
 
