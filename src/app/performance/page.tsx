@@ -23,6 +23,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 type MetricStatus = "긍정" | "부정" | "유지";
@@ -737,6 +738,14 @@ function ScorecardSettings({
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user && user.role !== "admin") {
+      router.replace("/");
+    }
+  }, [user, router]);
+
   const [tab, setTab] = useState<Tab>("brand");
   const [weekLabel] = useState("2026년 8월 4주차");
   const [people, setPeople] = useState<PersonReport[]>(MOCK_BRAND);

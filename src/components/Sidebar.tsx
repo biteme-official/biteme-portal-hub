@@ -105,18 +105,20 @@ export default function Sidebar() {
           <ClipboardCheck size={16} />
           <span>전자결재</span>
         </Link>
-        <Link
-          href="/performance"
-          onClick={close}
-          className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
-            pathname.startsWith("/performance")
-              ? "bg-accent-light text-accent font-semibold"
-              : "text-text-secondary hover:bg-surface"
-          }`}
-        >
-          <BarChart3 size={16} />
-          <span>주간 성과</span>
-        </Link>
+        {user?.role === "admin" && (
+          <Link
+            href="/performance"
+            onClick={close}
+            className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm no-underline transition-colors ${
+              pathname.startsWith("/performance")
+                ? "bg-accent-light text-accent font-semibold"
+                : "text-text-secondary hover:bg-surface"
+            }`}
+          >
+            <BarChart3 size={16} />
+            <span>주간 성과</span>
+          </Link>
+        )}
         {user?.role === "admin" && (
           <Link
             href="/admin/users"
