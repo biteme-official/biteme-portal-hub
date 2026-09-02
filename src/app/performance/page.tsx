@@ -15,21 +15,74 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  MessageSquare,
-  X,
   Eye,
   Lock,
   Settings,
   Plus,
   Trash2,
+  X,
+  Target,
+  Edit3,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
+// ─── Types ──────────────────────────────────────────────────
+
 type MetricStatus = "긍정" | "부정" | "유지";
-type OverrideStatus = "none" | "pending" | "approved" | "rejected";
 type ViewRole = "admin" | "member";
 type AdminSubTab = "aggregate" | "settings";
+
+interface WeekValue {
+  label: string;
+  value: number | null;
+}
+
+interface ChannelData {
+  channel: string;
+  weeks: WeekValue[];
+  monthlyCumulative: number;
+  monthlyTarget: number | null;
+  monthlyAchievement: number | null;
+  currentWeek: number;
+  prevWeek: number;
+  changeRate: number;
+  status: MetricStatus;
+}
+
+interface ActionItem {
+  id: string;
+  metric: string;
+  description: string;
+}
+
+interface AIFactor {
+  id: string;
+  type: MetricStatus;
+  channel: string;
+  description: string;
+  isAiRecommended: boolean;
+  isEditRequested: boolean;
+  editedDescription: string;
+}
+
+interface PersonReport {
+  name: string;
+  position: string;
+  team: string;
+  email: string;
+  keyMetrics: string[];
+  channels: ChannelData[];
+  totalMonthlyCM: number;
+  totalMonthlyTarget: number | null;
+  currentWeekTotal: number;
+  prevWeekTotal: number;
+  weekChangeRate: number;
+  actions: ActionItem[];
+  aiFactors: AIFactor[];
+  submitted: boolean;
+}
 
 interface ScorecardConfig {
   email: string;
@@ -38,8 +91,21 @@ interface ScorecardConfig {
   metrics: string[];
 }
 
+type Tab = "brand" | "growth" | "all";
+
+// ─── Constants ──────────────────────────────────────────────
+
+const MONTH_LABEL = "2026년 9월";
+const MONTH_WEEKS = ["W1 (9/1~7)", "W2 (9/8~14)", "W3 (9/15~21)", "W4 (9/22~28)"];
+
 const AVAILABLE_METRICS = [
   "자사몰", "스마트스토어", "쿠팡", "B2B", "해외", "그외", "온라인채널",
+];
+
+const TABS: { key: Tab; label: string; count: number }[] = [
+  { key: "brand", label: "브랜드팀", count: 3 },
+  { key: "growth", label: "그로스팀", count: 4 },
+  { key: "all", label: "전사", count: 7 },
 ];
 
 const MOCK_SCORECARD_CONFIGS: ScorecardConfig[] = [
@@ -48,121 +114,96 @@ const MOCK_SCORECARD_CONFIGS: ScorecardConfig[] = [
   { email: "hasun@biteme.co.kr", name: "유하선", team: "브랜드팀", metrics: ["자사몰", "온라인채널"] },
 ];
 
-interface ChannelMetric {
-  channel: string;
-  steady: number | null;
-  seasonal: number | null;
-  total: number;
-  prevTotal: number;
-  changeRate: number;
-  status: MetricStatus;
-  monthlyCumulative: number;
-  monthlyTarget: number | null;
-  monthlyAchievement: number | null;
+// ─── Mock Data ──────────────────────────────────────────────
+
+function makeChannel(
+  channel: string,
+  w1: number,
+  monthly: number,
+  target: number | null,
+  achievement: number | null,
+  prev: number,
+  rate: number,
+  status: MetricStatus,
+): ChannelData {
+  return {
+    channel,
+    weeks: [
+      { label: "W1", value: w1 },
+      { label: "W2", value: null },
+      { label: "W3", value: null },
+      { label: "W4", value: null },
+    ],
+    monthlyCumulative: monthly,
+    monthlyTarget: target,
+    monthlyAchievement: achievement,
+    currentWeek: w1,
+    prevWeek: prev,
+    changeRate: rate,
+    status,
+  };
 }
-
-interface PersonReport {
-  name: string;
-  position: string;
-  team: string;
-  division: string;
-  email: string;
-  channels: ChannelMetric[];
-  totalCM: number;
-  prevTotalCM: number;
-  totalChangeRate: number;
-  monthlyCumulativeCM: number;
-  monthlyTargetCM: number | null;
-  overallStatus: MetricStatus;
-  overrideStatus: OverrideStatus;
-  overrideReason: string;
-  action: string;
-  submitted: boolean;
-}
-
-type Tab = "brand" | "growth" | "all";
-
-const TABS: { key: Tab; label: string; count: number }[] = [
-  { key: "brand", label: "브랜드팀", count: 3 },
-  { key: "growth", label: "그로스팀", count: 4 },
-  { key: "all", label: "전사", count: 7 },
-];
 
 const MOCK_BRAND: PersonReport[] = [
   {
-    name: "이지윤",
-    position: "MD",
-    team: "브랜드팀",
-    division: "프로핏",
-    email: "jiyun@biteme.co.kr",
+    name: "이지윤", position: "MD", team: "브랜드팀", email: "jiyun@biteme.co.kr",
+    keyMetrics: ["자사몰", "스마트스토어", "쿠팡"],
     channels: [
-      { channel: "자사몰", steady: 4200000, seasonal: 1800000, total: 6000000, prevTotal: 5500000, changeRate: 9.1, status: "긍정", monthlyCumulative: 22500000, monthlyTarget: 25000000, monthlyAchievement: 90 },
-      { channel: "스마트스토어", steady: 3100000, seasonal: 900000, total: 4000000, prevTotal: 4200000, changeRate: -4.8, status: "부정", monthlyCumulative: 16800000, monthlyTarget: 18000000, monthlyAchievement: 93.3 },
-      { channel: "쿠팡", steady: 1500000, seasonal: 500000, total: 2000000, prevTotal: 2000000, changeRate: 0, status: "유지", monthlyCumulative: 8200000, monthlyTarget: 9000000, monthlyAchievement: 91.1 },
+      makeChannel("자사몰", 6000000, 22500000, 25000000, 90, 5500000, 9.1, "긍정"),
+      makeChannel("스마트스토어", 4000000, 16800000, 18000000, 93.3, 4200000, -4.8, "부정"),
+      makeChannel("쿠팡", 2000000, 8200000, 9000000, 91.1, 2000000, 0, "유지"),
     ],
-    totalCM: 12000000,
-    prevTotalCM: 11700000,
-    totalChangeRate: 2.6,
-    monthlyCumulativeCM: 47500000,
-    monthlyTargetCM: 52000000,
-    overallStatus: "긍정",
-    overrideStatus: "none",
-    overrideReason: "",
-    action: "",
+    totalMonthlyCM: 47500000, totalMonthlyTarget: 52000000,
+    currentWeekTotal: 12000000, prevWeekTotal: 11700000, weekChangeRate: 2.6,
+    actions: [],
+    aiFactors: [
+      { id: "f1", type: "긍정", channel: "자사몰", description: "자사몰 전주 대비 9.1% 상승, 시즌 기획전 효과로 판단", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+      { id: "f2", type: "부정", channel: "스마트스토어", description: "스마트스토어 -4.8% 하락, 경쟁 셀러 프로모션 영향 추정", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+      { id: "f3", type: "유지", channel: "쿠팡", description: "쿠팡 변동 없음, 광고비 대비 안정적 유지", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+    ],
     submitted: false,
   },
   {
-    name: "김소희",
-    position: "MD",
-    team: "브랜드팀",
-    division: "프로핏",
-    email: "sohee@biteme.co.kr",
+    name: "김소희", position: "MD", team: "브랜드팀", email: "sohee@biteme.co.kr",
+    keyMetrics: ["자사몰", "스마트스토어", "B2B"],
     channels: [
-      { channel: "자사몰", steady: 3800000, seasonal: 1200000, total: 5000000, prevTotal: 4600000, changeRate: 8.7, status: "긍정", monthlyCumulative: 19200000, monthlyTarget: 20000000, monthlyAchievement: 96 },
-      { channel: "스마트스토어", steady: 2800000, seasonal: 700000, total: 3500000, prevTotal: 3500000, changeRate: 0, status: "유지", monthlyCumulative: 14000000, monthlyTarget: 15000000, monthlyAchievement: 93.3 },
-      { channel: "B2B", steady: 1000000, seasonal: null, total: 1000000, prevTotal: 800000, changeRate: 25.0, status: "긍정", monthlyCumulative: 3800000, monthlyTarget: 4000000, monthlyAchievement: 95 },
+      makeChannel("자사몰", 5000000, 19200000, 20000000, 96, 4600000, 8.7, "긍정"),
+      makeChannel("스마트스토어", 3500000, 14000000, 15000000, 93.3, 3500000, 0, "유지"),
+      makeChannel("B2B", 1000000, 3800000, 4000000, 95, 800000, 25.0, "긍정"),
     ],
-    totalCM: 9500000,
-    prevTotalCM: 8900000,
-    totalChangeRate: 6.7,
-    monthlyCumulativeCM: 37000000,
-    monthlyTargetCM: 39000000,
-    overallStatus: "긍정",
-    overrideStatus: "none",
-    overrideReason: "",
-    action: "",
+    totalMonthlyCM: 37000000, totalMonthlyTarget: 39000000,
+    currentWeekTotal: 9500000, prevWeekTotal: 8900000, weekChangeRate: 6.7,
+    actions: [],
+    aiFactors: [
+      { id: "f1", type: "긍정", channel: "자사몰", description: "자사몰 +8.7% 성장, 리뷰 이벤트 효과", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+      { id: "f2", type: "긍정", channel: "B2B", description: "B2B +25% 대폭 상승, 신규 거래처 온보딩 효과", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+      { id: "f3", type: "유지", channel: "스마트스토어", description: "스마트스토어 변동 없음, 안정적 유지", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+    ],
     submitted: false,
   },
   {
-    name: "유하선",
-    position: "MD",
-    team: "브랜드팀",
-    division: "프로핏",
-    email: "hasun@biteme.co.kr",
+    name: "유하선", position: "MD", team: "브랜드팀", email: "hasun@biteme.co.kr",
+    keyMetrics: ["자사몰", "온라인채널"],
     channels: [
-      { channel: "자사몰", steady: 2900000, seasonal: 1100000, total: 4000000, prevTotal: 4300000, changeRate: -7.0, status: "부정", monthlyCumulative: 15600000, monthlyTarget: 18000000, monthlyAchievement: 86.7 },
-      { channel: "온라인채널", steady: 1800000, seasonal: 400000, total: 2200000, prevTotal: 2100000, changeRate: 4.8, status: "긍정", monthlyCumulative: 8800000, monthlyTarget: 9000000, monthlyAchievement: 97.8 },
+      makeChannel("자사몰", 4000000, 15600000, 18000000, 86.7, 4300000, -7.0, "부정"),
+      makeChannel("온라인채널", 2200000, 8800000, 9000000, 97.8, 2100000, 4.8, "긍정"),
     ],
-    totalCM: 6200000,
-    prevTotalCM: 6400000,
-    totalChangeRate: -3.1,
-    monthlyCumulativeCM: 24400000,
-    monthlyTargetCM: 27000000,
-    overallStatus: "부정",
-    overrideStatus: "none",
-    overrideReason: "",
-    action: "",
+    totalMonthlyCM: 24400000, totalMonthlyTarget: 27000000,
+    currentWeekTotal: 6200000, prevWeekTotal: 6400000, weekChangeRate: -3.1,
+    actions: [],
+    aiFactors: [
+      { id: "f1", type: "부정", channel: "자사몰", description: "자사몰 -7.0% 하락, 재고 부족에 따른 품절 영향", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+      { id: "f2", type: "긍정", channel: "온라인채널", description: "온라인채널 +4.8% 상승, 네이버 쇼핑 노출 증가", isAiRecommended: true, isEditRequested: false, editedDescription: "" },
+    ],
     submitted: false,
   },
 ];
 
+// ─── Utilities ──────────────────────────────────────────────
+
 function formatKRW(value: number): string {
-  if (Math.abs(value) >= 100000000) {
-    return `${(value / 100000000).toFixed(1)}억`;
-  }
-  if (Math.abs(value) >= 10000) {
-    return `${Math.round(value / 10000).toLocaleString()}만`;
-  }
+  if (Math.abs(value) >= 100000000) return `${(value / 100000000).toFixed(1)}억`;
+  if (Math.abs(value) >= 10000) return `${Math.round(value / 10000).toLocaleString()}만`;
   return value.toLocaleString();
 }
 
@@ -174,52 +215,11 @@ function StatusBadge({ status }: { status: MetricStatus }) {
   };
   const c = config[status];
   const Icon = c.icon;
-
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.bg} ${c.text} border ${c.border}`}>
       <Icon size={10} />
       {status}
     </span>
-  );
-}
-
-function OverallStatusBadge({
-  status,
-  overrideStatus,
-  onRequestOverride,
-  editable,
-}: {
-  status: MetricStatus;
-  overrideStatus: OverrideStatus;
-  onRequestOverride: () => void;
-  editable: boolean;
-}) {
-  const label = {
-    none: null,
-    pending: { text: "수정 요청 중", cls: "text-amber-600 bg-amber-50 border-amber-200" },
-    approved: { text: "수정 승인", cls: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-    rejected: { text: "수정 반려", cls: "text-red-600 bg-red-50 border-red-200" },
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <StatusBadge status={status} />
-      <span className="text-[10px] text-text-secondary/60">자동 판별</span>
-      {overrideStatus !== "none" && label[overrideStatus] && (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${label[overrideStatus]!.cls}`}>
-          {label[overrideStatus]!.text}
-        </span>
-      )}
-      {editable && overrideStatus === "none" && (
-        <button
-          onClick={onRequestOverride}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] text-text-secondary hover:text-accent hover:bg-accent/5 border border-border transition-colors"
-        >
-          <MessageSquare size={10} />
-          수정 요청
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -242,90 +242,352 @@ function AchievementBar({ value }: { value: number | null }) {
   );
 }
 
-function OverrideModal({
-  personName,
-  currentStatus,
-  onClose,
-  onSubmit,
-}: {
-  personName: string;
-  currentStatus: MetricStatus;
-  onClose: () => void;
-  onSubmit: (reason: string) => void;
-}) {
-  const [reason, setReason] = useState("");
+// ─── Monthly Scorecards ─────────────────────────────────────
+
+function MonthlyScorecards({ channels }: { channels: ChannelData[] }) {
+  const totalMonthly = channels.reduce((s, c) => s + c.monthlyCumulative, 0);
+  const totalTarget = channels.reduce((s, c) => s + (c.monthlyTarget ?? 0), 0);
+  const totalAchievement = totalTarget > 0 ? Math.round((totalMonthly / totalTarget) * 100) : null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl border border-border shadow-xl max-w-md w-full">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <h3 className="text-sm font-bold text-text-primary">상태 수정 요청</h3>
-          <button onClick={onClose} className="p-1 hover:bg-surface rounded-lg transition-colors">
-            <X size={16} className="text-text-secondary" />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <p className="text-xs text-text-secondary mb-1">대상</p>
-            <p className="text-sm font-medium text-text-primary">{personName}</p>
+    <div className="mb-5">
+      <p className="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wider">{MONTH_LABEL} 월간 누적</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {channels.map((ch) => {
+          const achColor = (ch.monthlyAchievement ?? 0) >= 100
+            ? "text-emerald-600" : (ch.monthlyAchievement ?? 0) >= 90
+            ? "text-amber-600" : "text-red-600";
+          return (
+            <div key={ch.channel} className="bg-white rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-text-secondary">{ch.channel}</span>
+                <StatusBadge status={ch.status} />
+              </div>
+              <p className="text-lg font-bold text-text-primary tabular-nums">{formatKRW(ch.monthlyCumulative)}</p>
+              <div className="flex items-center justify-between mt-2">
+                {ch.monthlyTarget && (
+                  <span className="text-[11px] text-text-secondary">
+                    목표 {formatKRW(ch.monthlyTarget)}
+                  </span>
+                )}
+                {ch.monthlyAchievement !== null && (
+                  <span className={`text-xs font-bold tabular-nums ${achColor}`}>
+                    {ch.monthlyAchievement.toFixed(0)}%
+                  </span>
+                )}
+              </div>
+              <AchievementBar value={ch.monthlyAchievement} />
+            </div>
+          );
+        })}
+        <div className="bg-accent/5 rounded-xl border border-accent/20 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-accent">합계</span>
           </div>
-          <div>
-            <p className="text-xs text-text-secondary mb-1">현재 자동 판별 상태</p>
-            <StatusBadge status={currentStatus} />
+          <p className="text-lg font-bold text-text-primary tabular-nums">{formatKRW(totalMonthly)}</p>
+          <div className="flex items-center justify-between mt-2">
+            {totalTarget > 0 && (
+              <span className="text-[11px] text-text-secondary">목표 {formatKRW(totalTarget)}</span>
+            )}
+            {totalAchievement !== null && (
+              <span className={`text-xs font-bold tabular-nums ${totalAchievement >= 100 ? "text-emerald-600" : totalAchievement >= 90 ? "text-amber-600" : "text-red-600"}`}>
+                {totalAchievement}%
+              </span>
+            )}
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary mb-2">
-              수정 사유
-            </label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="자동 판별된 상태가 부정확한 이유를 설명해주세요. (예: 반품 건 제외 시 실제 긍정)"
-              rows={3}
-              className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-white text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-border">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-text-secondary hover:bg-surface rounded-lg transition-colors"
-          >
-            취소
-          </button>
-          <button
-            disabled={reason.trim().length === 0}
-            onClick={() => onSubmit(reason)}
-            className="px-4 py-2 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            수정 요청
-          </button>
+          <AchievementBar value={totalAchievement} />
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Weekly Breakdown Table ─────────────────────────────────
+
+function WeeklyTable({ channels }: { channels: ChannelData[] }) {
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wider">{MONTH_LABEL} 주간 추이</p>
+      <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-surface/70">
+                <th className="text-left text-[11px] font-semibold text-text-secondary px-4 py-2.5 uppercase tracking-wider">채널</th>
+                {MONTH_WEEKS.map((w, i) => (
+                  <th key={i} className={`text-right text-[11px] font-semibold px-3 py-2.5 uppercase tracking-wider ${i === 0 ? "text-accent" : "text-text-secondary/50"}`}>
+                    {w}
+                  </th>
+                ))}
+                <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">전주</th>
+                <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">변화</th>
+                <th className="text-center text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {channels.map((ch) => (
+                <tr key={ch.channel} className="border-t border-border/50 hover:bg-surface/30 transition-colors">
+                  <td className="px-4 py-2.5 font-medium text-text-primary">{ch.channel}</td>
+                  {ch.weeks.map((w, i) => (
+                    <td key={i} className={`px-3 py-2.5 text-right tabular-nums ${i === 0 ? "font-semibold text-text-primary" : "text-text-secondary/40"}`}>
+                      {w.value !== null ? formatKRW(w.value) : "—"}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2.5 text-right text-text-secondary tabular-nums">{formatKRW(ch.prevWeek)}</td>
+                  <td className="px-3 py-2.5 text-right"><ChangeRate rate={ch.changeRate} /></td>
+                  <td className="px-3 py-2.5 text-center"><StatusBadge status={ch.status} /></td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-border bg-surface/50">
+                <td className="px-4 py-2.5 font-bold text-text-primary">합계</td>
+                {MONTH_WEEKS.map((_, i) => {
+                  const weekTotal = channels.reduce((s, ch) => s + (ch.weeks[i]?.value ?? 0), 0);
+                  const hasData = channels.some((ch) => ch.weeks[i]?.value !== null);
+                  return (
+                    <td key={i} className={`px-3 py-2.5 text-right tabular-nums ${i === 0 ? "font-bold text-text-primary" : "text-text-secondary/40"}`}>
+                      {hasData ? formatKRW(weekTotal) : "—"}
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-2.5 text-right font-semibold text-text-secondary tabular-nums">
+                  {formatKRW(channels.reduce((s, ch) => s + ch.prevWeek, 0))}
+                </td>
+                <td className="px-3 py-2.5" />
+                <td className="px-3 py-2.5" />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Action Input Section ───────────────────────────────────
+
+function ActionSection({
+  actions,
+  keyMetrics,
+  onAdd,
+  onRemove,
+  readOnly,
+}: {
+  actions: ActionItem[];
+  keyMetrics: string[];
+  onAdd: (metric: string, description: string) => void;
+  onRemove: (id: string) => void;
+  readOnly: boolean;
+}) {
+  const [selectedMetric, setSelectedMetric] = useState(keyMetrics[0] ?? "");
+  const [actionText, setActionText] = useState("");
+
+  function handleAdd() {
+    if (!selectedMetric || !actionText.trim()) return;
+    onAdd(selectedMetric, actionText.trim());
+    setActionText("");
+  }
+
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wider">이번 주 액션</p>
+      <div className="bg-white rounded-xl border border-border p-4">
+        {!readOnly && (
+          <div className="flex gap-2 mb-4">
+            <div className="relative shrink-0">
+              <Target size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <select
+                value={selectedMetric}
+                onChange={(e) => setSelectedMetric(e.target.value)}
+                className="pl-8 pr-8 py-2.5 text-sm border border-border rounded-lg bg-white text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
+              >
+                {keyMetrics.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+            </div>
+            <input
+              type="text"
+              value={actionText}
+              onChange={(e) => setActionText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="수행한 액션 또는 다음 주 계획 입력..."
+              className="flex-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-white text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!actionText.trim()}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              <Plus size={14} />
+              추가
+            </button>
+          </div>
+        )}
+
+        {actions.length > 0 ? (
+          <div className="space-y-2">
+            {actions.map((a) => (
+              <div key={a.id} className="flex items-start gap-3 px-3 py-2.5 bg-surface/50 border border-border/50 rounded-lg group">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent/10 text-accent text-[11px] font-semibold rounded-full shrink-0 mt-0.5">
+                  <Target size={10} />
+                  {a.metric}
+                </span>
+                <span className="text-sm text-text-primary leading-relaxed flex-1">{a.description}</span>
+                {!readOnly && (
+                  <button
+                    onClick={() => onRemove(a.id)}
+                    className="p-1 rounded hover:bg-red-50 text-text-secondary/40 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-sm text-text-secondary/50">
+            {readOnly ? "등록된 액션이 없습니다" : "영향 지표를 선택하고 액션을 추가하세요"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Factors Panel ───────────────────────────────────────
+
+function AIFactorsPanel({
+  factors,
+  onRequestEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditChange,
+  isAdmin,
+}: {
+  factors: AIFactor[];
+  onRequestEdit: (factorId: string) => void;
+  onSaveEdit: (factorId: string) => void;
+  onCancelEdit: (factorId: string) => void;
+  onEditChange: (factorId: string, text: string) => void;
+  isAdmin: boolean;
+}) {
+  const statusConfig = {
+    긍정: { bg: "border-l-emerald-400", icon: TrendingUp, iconColor: "text-emerald-600" },
+    부정: { bg: "border-l-red-400", icon: TrendingDown, iconColor: "text-red-600" },
+    유지: { bg: "border-l-gray-300", icon: Minus, iconColor: "text-gray-500" },
+  };
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles size={14} className="text-accent" />
+        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">AI 분석 요인</p>
+      </div>
+      <div className="space-y-2">
+        {factors.map((f) => {
+          const cfg = statusConfig[f.type];
+          const Icon = cfg.icon;
+          return (
+            <div key={f.id} className={`bg-white rounded-lg border border-border border-l-[3px] ${cfg.bg} p-3`}>
+              <div className="flex items-start gap-3">
+                <Icon size={14} className={`${cfg.iconColor} mt-0.5 shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <StatusBadge status={f.type} />
+                    <span className="text-xs font-medium text-text-primary">{f.channel}</span>
+                    {f.isAiRecommended && !f.isEditRequested && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-violet-600 bg-violet-50 border border-violet-200">
+                        <Sparkles size={9} />
+                        AI 추천
+                      </span>
+                    )}
+                    {f.isEditRequested && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200">
+                        <Edit3 size={9} />
+                        수정요청
+                      </span>
+                    )}
+                  </div>
+
+                  {f.isEditRequested ? (
+                    <div className="mt-2">
+                      <textarea
+                        value={f.editedDescription || f.description}
+                        onChange={(e) => onEditChange(f.id, e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 text-sm border border-amber-300 rounded-lg bg-amber-50/30 text-text-primary focus:outline-none focus:border-accent resize-none"
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          onClick={() => onCancelEdit(f.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-surface rounded-md transition-colors"
+                        >
+                          <X size={11} />
+                          취소
+                        </button>
+                        <button
+                          onClick={() => onSaveEdit(f.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-white bg-accent rounded-md hover:bg-accent/90 transition-colors"
+                        >
+                          <Check size={11} />
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-secondary leading-relaxed">{f.description}</p>
+                  )}
+                </div>
+
+                {isAdmin && !f.isEditRequested && (
+                  <button
+                    onClick={() => onRequestEdit(f.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-secondary hover:text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors shrink-0"
+                  >
+                    <Edit3 size={10} />
+                    수정요청
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Person Card ────────────────────────────────────────────
+
 function PersonCard({
   person,
-  onActionChange,
-  onRequestOverride,
+  onAddAction,
+  onRemoveAction,
+  onRequestFactorEdit,
+  onSaveFactorEdit,
+  onCancelFactorEdit,
+  onFactorEditChange,
   viewRole,
   isOwnCard,
 }: {
   person: PersonReport;
-  onActionChange: (value: string) => void;
-  onRequestOverride: () => void;
+  onAddAction: (metric: string, description: string) => void;
+  onRemoveAction: (actionId: string) => void;
+  onRequestFactorEdit: (factorId: string) => void;
+  onSaveFactorEdit: (factorId: string) => void;
+  onCancelFactorEdit: (factorId: string) => void;
+  onFactorEditChange: (factorId: string, text: string) => void;
   viewRole: ViewRole;
   isOwnCard: boolean;
 }) {
   const [expanded, setExpanded] = useState(isOwnCard);
+  const canEdit = isOwnCard || viewRole === "admin";
+  const monthlyAchievement = person.totalMonthlyTarget
+    ? Math.round((person.totalMonthlyCM / person.totalMonthlyTarget) * 100)
+    : null;
   const positiveCount = person.channels.filter((c) => c.status === "긍정").length;
   const negativeCount = person.channels.filter((c) => c.status === "부정").length;
-  const canEdit = isOwnCard || viewRole === "admin";
-  const monthlyAchievement = person.monthlyTargetCM
-    ? Math.round((person.monthlyCumulativeCM / person.monthlyTargetCM) * 100)
-    : null;
 
   return (
     <div className={`bg-surface-card rounded-xl border overflow-hidden ${isOwnCard ? "border-accent/30 ring-1 ring-accent/10" : "border-border"}`}>
@@ -352,12 +614,12 @@ function PersonCard({
             </div>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
               <span className="text-xs text-text-secondary">
-                이번주 <span className="font-semibold text-text-primary">{formatKRW(person.totalCM)}</span>
+                이번주 <span className="font-semibold text-text-primary">{formatKRW(person.currentWeekTotal)}</span>
               </span>
-              <ChangeRate rate={person.totalChangeRate} />
+              <ChangeRate rate={person.weekChangeRate} />
               <span className="text-[10px] text-text-secondary/60">|</span>
               <span className="text-xs text-text-secondary">
-                월 누적 <span className="font-semibold text-text-primary">{formatKRW(person.monthlyCumulativeCM)}</span>
+                월 누적 <span className="font-semibold text-text-primary">{formatKRW(person.totalMonthlyCM)}</span>
               </span>
               {monthlyAchievement !== null && (
                 <span className={`text-[11px] font-semibold tabular-nums ${monthlyAchievement >= 100 ? "text-emerald-600" : monthlyAchievement >= 90 ? "text-amber-600" : "text-red-600"}`}>
@@ -376,6 +638,12 @@ function PersonCard({
                   </span>
                 )}
               </div>
+              {person.aiFactors.some((f) => f.isEditRequested) && viewRole === "admin" && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200">
+                  <Edit3 size={9} />
+                  수정요청 {person.aiFactors.filter((f) => f.isEditRequested).length}건
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -383,118 +651,42 @@ function PersonCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-border">
-          <div className="px-5 py-3 bg-surface/30 border-b border-border/50 flex items-center justify-between flex-wrap gap-2">
-            <OverallStatusBadge
-              status={person.overallStatus}
-              overrideStatus={person.overrideStatus}
-              onRequestOverride={onRequestOverride}
-              editable={canEdit}
-            />
-            {!canEdit && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-text-secondary/50">
-                <Lock size={10} />
-                읽기 전용
-              </span>
-            )}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-surface/70">
-                  <th className="text-left text-[11px] font-semibold text-text-secondary px-5 py-2.5 uppercase tracking-wider">채널</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">스테디</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">시즈널</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">이번주</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">전주</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">변화</th>
-                  <th className="text-right text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">월 누적</th>
-                  <th className="text-center text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">달성률</th>
-                  <th className="text-center text-[11px] font-semibold text-text-secondary px-3 py-2.5 uppercase tracking-wider">상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {person.channels.map((ch) => (
-                  <tr key={ch.channel} className="border-t border-border/50 hover:bg-surface/30 transition-colors">
-                    <td className="px-5 py-2.5 font-medium text-text-primary">{ch.channel}</td>
-                    <td className="px-3 py-2.5 text-right text-text-secondary tabular-nums">
-                      {ch.steady !== null ? formatKRW(ch.steady) : <span className="text-text-secondary/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-text-secondary tabular-nums">
-                      {ch.seasonal !== null ? formatKRW(ch.seasonal) : <span className="text-text-secondary/40">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-text-primary tabular-nums">{formatKRW(ch.total)}</td>
-                    <td className="px-3 py-2.5 text-right text-text-secondary tabular-nums">{formatKRW(ch.prevTotal)}</td>
-                    <td className="px-3 py-2.5 text-right"><ChangeRate rate={ch.changeRate} /></td>
-                    <td className="px-3 py-2.5 text-right font-medium text-text-primary tabular-nums">{formatKRW(ch.monthlyCumulative)}</td>
-                    <td className="px-3 py-2.5"><AchievementBar value={ch.monthlyAchievement} /></td>
-                    <td className="px-3 py-2.5 text-center"><StatusBadge status={ch.status} /></td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-border bg-surface/50">
-                  <td className="px-5 py-2.5 font-bold text-text-primary">합계</td>
-                  <td className="px-3 py-2.5" />
-                  <td className="px-3 py-2.5" />
-                  <td className="px-3 py-2.5 text-right font-bold text-text-primary tabular-nums">{formatKRW(person.totalCM)}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-text-secondary tabular-nums">{formatKRW(person.prevTotalCM)}</td>
-                  <td className="px-3 py-2.5 text-right"><ChangeRate rate={person.totalChangeRate} /></td>
-                  <td className="px-3 py-2.5 text-right font-bold text-text-primary tabular-nums">{formatKRW(person.monthlyCumulativeCM)}</td>
-                  <td className="px-3 py-2.5">
-                    <AchievementBar value={person.monthlyTargetCM ? Math.round((person.monthlyCumulativeCM / person.monthlyTargetCM) * 100) : null} />
-                  </td>
-                  <td className="px-3 py-2.5" />
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {canEdit ? (
-            <div className="p-5 border-t border-border">
-              <label className="block text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
-                이번 주 액션
-              </label>
-              <textarea
-                value={person.action}
-                onChange={(e) => onActionChange(e.target.value)}
-                placeholder="이번 주 수행한 액션과 다음 주 계획을 입력하세요..."
-                rows={3}
-                className="w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-white text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent resize-none"
-              />
+        <div className="border-t border-border px-5 py-5 space-y-0">
+          {!canEdit && (
+            <div className="flex items-center gap-1 mb-4 text-[10px] text-text-secondary/50">
+              <Lock size={10} />
+              읽기 전용
             </div>
-          ) : person.action ? (
-            <div className="p-5 border-t border-border">
-              <p className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">이번 주 액션</p>
-              <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{person.action}</p>
-            </div>
-          ) : null}
+          )}
 
-          <div className="px-5 pb-4">
-            <div className="flex items-start gap-2.5 p-3 bg-accent/5 border border-accent/15 rounded-lg">
-              <Sparkles size={14} className="text-accent mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[11px] font-semibold text-accent mb-0.5">AI 분석</p>
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  데이터가 연결되면 자동으로 성과 분석 및 인사이트가 생성됩니다.
-                </p>
-              </div>
-            </div>
-          </div>
+          <MonthlyScorecards channels={person.channels} />
+          <WeeklyTable channels={person.channels} />
+
+          <ActionSection
+            actions={person.actions}
+            keyMetrics={person.keyMetrics}
+            onAdd={onAddAction}
+            onRemove={onRemoveAction}
+            readOnly={!canEdit}
+          />
+
+          <AIFactorsPanel
+            factors={person.aiFactors}
+            onRequestEdit={onRequestFactorEdit}
+            onSaveEdit={onSaveFactorEdit}
+            onCancelEdit={onCancelFactorEdit}
+            onEditChange={onFactorEditChange}
+            isAdmin={viewRole === "admin"}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function WeekSelector({
-  week,
-  onPrev,
-  onNext,
-}: {
-  week: string;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
+// ─── Shared Components ──────────────────────────────────────
+
+function WeekSelector({ week, onPrev, onNext }: { week: string; onPrev: () => void; onNext: () => void }) {
   return (
     <div className="flex items-center gap-1 bg-white border border-border rounded-lg px-1">
       <button onClick={onPrev} className="p-1.5 hover:bg-surface rounded transition-colors">
@@ -512,11 +704,11 @@ function WeekSelector({
 }
 
 function TeamSummaryBar({ people }: { people: PersonReport[] }) {
-  const totalCM = people.reduce((s, p) => s + p.totalCM, 0);
-  const prevCM = people.reduce((s, p) => s + p.prevTotalCM, 0);
+  const totalCM = people.reduce((s, p) => s + p.currentWeekTotal, 0);
+  const prevCM = people.reduce((s, p) => s + p.prevWeekTotal, 0);
   const changeRate = prevCM > 0 ? ((totalCM - prevCM) / prevCM) * 100 : 0;
-  const monthlyCum = people.reduce((s, p) => s + p.monthlyCumulativeCM, 0);
-  const submitted = people.filter((p) => p.submitted || p.action.trim().length > 0).length;
+  const monthlyCum = people.reduce((s, p) => s + p.totalMonthlyCM, 0);
+  const submitted = people.filter((p) => p.submitted || p.actions.length > 0).length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
@@ -543,10 +735,7 @@ function TeamSummaryBar({ people }: { people: PersonReport[] }) {
         <div className="flex items-center gap-2">
           <p className="text-lg font-bold text-text-primary">{submitted}/{people.length}</p>
           <div className="flex-1 h-1.5 bg-surface rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent rounded-full transition-all"
-              style={{ width: `${people.length > 0 ? (submitted / people.length) * 100 : 0}%` }}
-            />
+            <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${people.length > 0 ? (submitted / people.length) * 100 : 0}%` }} />
           </div>
         </div>
       </div>
@@ -559,7 +748,6 @@ function ViewModeSelector({ viewRole, onChange }: { viewRole: ViewRole; onChange
     { key: "member", label: "내 보고", icon: User },
     { key: "admin", label: "관리자", icon: Eye },
   ];
-
   return (
     <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
       {options.map((opt) => {
@@ -569,11 +757,7 @@ function ViewModeSelector({ viewRole, onChange }: { viewRole: ViewRole; onChange
           <button
             key={opt.key}
             onClick={() => onChange(opt.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              active
-                ? "bg-white text-accent shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${active ? "bg-white text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"}`}
           >
             <Icon size={12} />
             {opt.label}
@@ -589,7 +773,6 @@ function AdminSubTabSelector({ subTab, onChange }: { subTab: AdminSubTab; onChan
     { key: "aggregate", label: "취합", icon: BarChart3 },
     { key: "settings", label: "설정", icon: Settings },
   ];
-
   return (
     <div className="flex items-center gap-1 border-b border-border mb-5">
       {tabs.map((t) => {
@@ -598,11 +781,7 @@ function AdminSubTabSelector({ subTab, onChange }: { subTab: AdminSubTab; onChan
           <button
             key={t.key}
             onClick={() => onChange(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              subTab === t.key
-                ? "border-accent text-accent"
-                : "border-transparent text-text-secondary hover:text-text-primary"
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${subTab === t.key ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"}`}
           >
             <Icon size={14} />
             {t.label}
@@ -613,22 +792,16 @@ function AdminSubTabSelector({ subTab, onChange }: { subTab: AdminSubTab; onChan
   );
 }
 
-function ScorecardSettings({
-  configs,
-  onUpdate,
-}: {
-  configs: ScorecardConfig[];
-  onUpdate: (configs: ScorecardConfig[]) => void;
-}) {
+// ─── Scorecard Settings ─────────────────────────────────────
+
+function ScorecardSettings({ configs, onUpdate }: { configs: ScorecardConfig[]; onUpdate: (configs: ScorecardConfig[]) => void }) {
   const [selectedEmail, setSelectedEmail] = useState<string | null>(configs[0]?.email ?? null);
   const selectedConfig = configs.find((c) => c.email === selectedEmail);
-
   const teams = [...new Set(configs.map((c) => c.team))];
 
   function addMetric(email: string, metric: string) {
     onUpdate(configs.map((c) => c.email === email ? { ...c, metrics: [...c.metrics, metric] } : c));
   }
-
   function removeMetric(email: string, metric: string) {
     onUpdate(configs.map((c) => c.email === email ? { ...c, metrics: c.metrics.filter((m) => m !== metric) } : c));
   }
@@ -639,23 +812,16 @@ function ScorecardSettings({
         <h3 className="text-sm font-bold text-text-primary">담당자별 스코어카드 설정</h3>
         <p className="text-xs text-text-secondary mt-1">각 담당자가 추적할 채널(지표)을 지정합니다</p>
       </div>
-
       <div className="flex min-h-[400px]">
         <div className="w-52 border-r border-border bg-surface/30 shrink-0">
           {teams.map((team) => (
             <div key={team}>
-              <div className="px-4 py-2 text-[11px] font-semibold text-text-secondary uppercase tracking-wider bg-surface/50">
-                {team}
-              </div>
+              <div className="px-4 py-2 text-[11px] font-semibold text-text-secondary uppercase tracking-wider bg-surface/50">{team}</div>
               {configs.filter((c) => c.team === team).map((c) => (
                 <button
                   key={c.email}
                   onClick={() => setSelectedEmail(c.email)}
-                  className={`w-full text-left px-4 py-3 text-sm transition-colors border-l-2 ${
-                    selectedEmail === c.email
-                      ? "bg-white border-accent text-accent font-medium"
-                      : "border-transparent text-text-primary hover:bg-surface/50"
-                  }`}
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors border-l-2 ${selectedEmail === c.email ? "bg-white border-accent text-accent font-medium" : "border-transparent text-text-primary hover:bg-surface/50"}`}
                 >
                   <span className="block">{c.name}</span>
                   <span className="block text-[11px] text-text-secondary mt-0.5">{c.metrics.length}개 지표</span>
@@ -664,7 +830,6 @@ function ScorecardSettings({
             </div>
           ))}
         </div>
-
         <div className="flex-1 p-5">
           {selectedConfig ? (
             <>
@@ -677,44 +842,30 @@ function ScorecardSettings({
                   <p className="text-xs text-text-secondary">{selectedConfig.team} · {selectedConfig.email}</p>
                 </div>
               </div>
-
               <div className="mb-4">
                 <p className="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wider">할당된 스코어카드 지표</p>
                 <div className="space-y-2">
                   {selectedConfig.metrics.map((metric, idx) => (
-                    <div
-                      key={metric}
-                      className="flex items-center justify-between px-4 py-3 bg-white border border-border rounded-lg group"
-                    >
+                    <div key={metric} className="flex items-center justify-between px-4 py-3 bg-white border border-border rounded-lg group">
                       <div className="flex items-center gap-3">
                         <span className="text-[11px] text-text-secondary/50 tabular-nums w-5">{idx + 1}</span>
                         <span className="text-sm font-medium text-text-primary">{metric}</span>
                       </div>
-                      <button
-                        onClick={() => removeMetric(selectedConfig.email, metric)}
-                        className="p-1 rounded hover:bg-red-50 text-text-secondary/40 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                      >
+                      <button onClick={() => removeMetric(selectedConfig.email, metric)} className="p-1 rounded hover:bg-red-50 text-text-secondary/40 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                   {selectedConfig.metrics.length === 0 && (
-                    <div className="text-center py-8 text-sm text-text-secondary/50">
-                      할당된 지표가 없습니다
-                    </div>
+                    <div className="text-center py-8 text-sm text-text-secondary/50">할당된 지표가 없습니다</div>
                   )}
                 </div>
               </div>
-
               <div>
                 <p className="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wider">추가 가능한 지표</p>
                 <div className="flex flex-wrap gap-2">
                   {AVAILABLE_METRICS.filter((m) => !selectedConfig.metrics.includes(m)).map((metric) => (
-                    <button
-                      key={metric}
-                      onClick={() => addMetric(selectedConfig.email, metric)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-text-secondary bg-surface border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
-                    >
+                    <button key={metric} onClick={() => addMetric(selectedConfig.email, metric)} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-text-secondary bg-surface border border-border rounded-lg hover:border-accent hover:text-accent transition-colors">
                       <Plus size={14} />
                       {metric}
                     </button>
@@ -726,15 +877,15 @@ function ScorecardSettings({
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-full text-sm text-text-secondary/50">
-              담당자를 선택하세요
-            </div>
+            <div className="flex items-center justify-center h-full text-sm text-text-secondary/50">담당자를 선택하세요</div>
           )}
         </div>
       </div>
     </div>
   );
 }
+
+// ─── Main Page ──────────────────────────────────────────────
 
 export default function PerformancePage() {
   const { user } = useAuth();
@@ -747,9 +898,8 @@ export default function PerformancePage() {
   }, [user, router]);
 
   const [tab, setTab] = useState<Tab>("brand");
-  const [weekLabel] = useState("2026년 8월 4주차");
+  const [weekLabel] = useState("2026년 9월 1주차");
   const [people, setPeople] = useState<PersonReport[]>(MOCK_BRAND);
-  const [overrideModal, setOverrideModal] = useState<number | null>(null);
 
   const isAdmin = user?.role === "admin";
   const [viewRole, setViewRole] = useState<ViewRole>("member");
@@ -764,44 +914,104 @@ export default function PerformancePage() {
     }
   }, [user, roleInitialized]);
 
-  function handleActionChange(index: number, value: string) {
-    setPeople((prev) => prev.map((p, i) => (i === index ? { ...p, action: value } : p)));
-  }
-
-  function handleOverrideSubmit(index: number, reason: string) {
+  function handleAddAction(personIndex: number, metric: string, description: string) {
     setPeople((prev) =>
       prev.map((p, i) =>
-        i === index ? { ...p, overrideStatus: "pending" as OverrideStatus, overrideReason: reason } : p
+        i === personIndex
+          ? { ...p, actions: [...p.actions, { id: `a${Date.now()}`, metric, description }] }
+          : p
       )
     );
-    setOverrideModal(null);
   }
 
-  const submitted = people.filter((p) => p.submitted || p.action.trim().length > 0).length;
-  const allSubmitted = submitted === people.length && people.length > 0;
+  function handleRemoveAction(personIndex: number, actionId: string) {
+    setPeople((prev) =>
+      prev.map((p, i) =>
+        i === personIndex
+          ? { ...p, actions: p.actions.filter((a) => a.id !== actionId) }
+          : p
+      )
+    );
+  }
+
+  function handleRequestFactorEdit(personIndex: number, factorId: string) {
+    setPeople((prev) =>
+      prev.map((p, i) =>
+        i === personIndex
+          ? {
+              ...p,
+              aiFactors: p.aiFactors.map((f) =>
+                f.id === factorId ? { ...f, isEditRequested: true, editedDescription: f.description } : f
+              ),
+            }
+          : p
+      )
+    );
+  }
+
+  function handleSaveFactorEdit(personIndex: number, factorId: string) {
+    setPeople((prev) =>
+      prev.map((p, i) =>
+        i === personIndex
+          ? {
+              ...p,
+              aiFactors: p.aiFactors.map((f) =>
+                f.id === factorId ? { ...f, description: f.editedDescription || f.description, isAiRecommended: false } : f
+              ),
+            }
+          : p
+      )
+    );
+  }
+
+  function handleCancelFactorEdit(personIndex: number, factorId: string) {
+    setPeople((prev) =>
+      prev.map((p, i) =>
+        i === personIndex
+          ? {
+              ...p,
+              aiFactors: p.aiFactors.map((f) =>
+                f.id === factorId ? { ...f, isEditRequested: false, editedDescription: "" } : f
+              ),
+            }
+          : p
+      )
+    );
+  }
+
+  function handleFactorEditChange(personIndex: number, factorId: string, text: string) {
+    setPeople((prev) =>
+      prev.map((p, i) =>
+        i === personIndex
+          ? {
+              ...p,
+              aiFactors: p.aiFactors.map((f) =>
+                f.id === factorId ? { ...f, editedDescription: text } : f
+              ),
+            }
+          : p
+      )
+    );
+  }
 
   const visiblePeople = viewRole === "member"
     ? people.filter((p) => p.email === user?.email)
     : people;
+
+  const submitted = people.filter((p) => p.submitted || p.actions.length > 0).length;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-bold text-text-primary">주간 성과 보고</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            채널별 공헌이익 확인 및 주간 액션 작성
-          </p>
+          <p className="text-sm text-text-secondary mt-1">채널별 공헌이익 확인 및 주간 액션 작성</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <WeekSelector
-            week={weekLabel}
-            onPrev={() => {}}
-            onNext={() => {}}
-          />
+          <WeekSelector week={weekLabel} onPrev={() => {}} onNext={() => {}} />
           {viewRole === "member" && (
             <button
-              disabled={visiblePeople.length === 0 || visiblePeople.every((p) => p.action.trim().length === 0)}
+              disabled={visiblePeople.length === 0 || visiblePeople.every((p) => p.actions.length === 0)}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send size={14} />
@@ -839,16 +1049,10 @@ export default function PerformancePage() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`px-3 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    tab === t.key
-                      ? "border-accent text-accent"
-                      : "border-transparent text-text-secondary hover:text-text-primary"
-                  }`}
+                  className={`px-3 md:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === t.key ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"}`}
                 >
                   {t.label}
-                  <span className="ml-1.5 text-[10px] bg-surface text-text-secondary px-1.5 py-0.5 rounded-full">
-                    {t.count}
-                  </span>
+                  <span className="ml-1.5 text-[10px] bg-surface text-text-secondary px-1.5 py-0.5 rounded-full">{t.count}</span>
                 </button>
               ))}
             </div>
@@ -857,14 +1061,18 @@ export default function PerformancePage() {
           <TeamSummaryBar people={visiblePeople} />
 
           <div className="space-y-4">
-            {visiblePeople.map((person, i) => {
+            {visiblePeople.map((person) => {
               const realIndex = people.indexOf(person);
               return (
                 <PersonCard
-                  key={person.name}
+                  key={person.email}
                   person={person}
-                  onActionChange={(v) => handleActionChange(realIndex, v)}
-                  onRequestOverride={() => setOverrideModal(realIndex)}
+                  onAddAction={(m, d) => handleAddAction(realIndex, m, d)}
+                  onRemoveAction={(id) => handleRemoveAction(realIndex, id)}
+                  onRequestFactorEdit={(fid) => handleRequestFactorEdit(realIndex, fid)}
+                  onSaveFactorEdit={(fid) => handleSaveFactorEdit(realIndex, fid)}
+                  onCancelFactorEdit={(fid) => handleCancelFactorEdit(realIndex, fid)}
+                  onFactorEditChange={(fid, text) => handleFactorEditChange(realIndex, fid, text)}
                   viewRole={viewRole}
                   isOwnCard={person.email === user?.email}
                 />
@@ -890,15 +1098,6 @@ export default function PerformancePage() {
 
       {viewRole === "admin" && adminSubTab === "settings" && (
         <ScorecardSettings configs={scorecardConfigs} onUpdate={setScorecardConfigs} />
-      )}
-
-      {overrideModal !== null && (
-        <OverrideModal
-          personName={people[overrideModal].name}
-          currentStatus={people[overrideModal].overallStatus}
-          onClose={() => setOverrideModal(null)}
-          onSubmit={(reason) => handleOverrideSubmit(overrideModal, reason)}
-        />
       )}
     </div>
   );
