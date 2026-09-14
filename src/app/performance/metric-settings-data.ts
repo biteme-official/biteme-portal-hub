@@ -68,12 +68,10 @@ export interface GoalSetting {
   unit: MetricUnit;
   source: MetricSource;
   sourceNote: string;
-  /** 팀 KPI: 분기 단독 목표 */
+  /** 분기별 목표 (분기 단독 금액). 누적은 상반기 실적 + 분기 합으로 계산 */
   targets: Targets;
   /** 전사·본부: 연간 목표 */
   annualTarget?: number | null;
-  /** 전사·본부: 분기 말 누적 마일스톤 (4Q 말 = 연간 목표) */
-  milestones?: Targets;
   /** 전사·본부: 상반기 실적 (누적 시작점) */
   h1Actual?: number | null;
   /** 근거·확정 필요 사항 */
@@ -115,29 +113,29 @@ export function buildSeedGoals(): GoalSetting[] {
     {
       id: "company:revenue", level: "company", name: "전사 매출", division: null, team: null, parentId: null,
       unit: "currency", source: "connectable", sourceNote: "국내 2026 SUMMARY 시트 + 인케어 매출 시트 (KPI 시트 동기화 로직 재사용)",
-      targets: {}, annualTarget: 200 * EOK, milestones: { "2026Q3": 138.8 * EOK }, h1Actual: 86 * EOK,
-      note: "3Q 말 누적 = H1 86억 + 3Q 배분 52.8억 (월 배분 7~12월 15.8/17.4/19.6/19.1/20.3/21.8억)",
+      targets: { "2026Q3": 52 * EOK, "2026Q4": 61 * EOK }, annualTarget: 200 * EOK, h1Actual: 87.8 * EOK,
+      note: "전사 마일스톤: Q1 39.7억 · Q2 48.1억 (실적) · Q3 52억 · Q4 61억",
     },
     {
       id: "company:op", level: "company", name: "전사 영업이익", division: null, team: null, parentId: null,
       unit: "currency", source: "connectable", sourceNote: "국내 공헌이익 − 고정비 일할(월 2.2억)",
-      targets: {}, annualTarget: 20 * EOK, milestones: { "2026Q3": null }, h1Actual: 11 * EOK,
-      note: "H2 필요 9억 — 3Q 말 누적 목표 미정",
+      targets: { "2026Q3": 4 * EOK, "2026Q4": 5 * EOK }, annualTarget: 20 * EOK, h1Actual: 11.7 * EOK,
+      note: "전사 마일스톤: Q1 6억 · Q2 5.7억 (실적) · Q3 4억 · Q4 5억",
     },
     {
       id: "division:CEO본부", level: "division", name: "글로벌 매출 (해외팀 + 인케어)", division: "CEO본부", team: null, parentId: "company:revenue",
       unit: "currency", source: "connectable", sourceNote: "국내 해외사업부 + 일본 인케어(9.4원/엔)",
-      targets: {}, annualTarget: null, milestones: {}, h1Actual: null, note: "H1 연간목표 글로벌 25억 + 인케어 30억 — H2 배분 확정 필요",
+      targets: {}, annualTarget: null, h1Actual: null, note: "H1 연간목표 글로벌 25억 + 인케어 30억 — H2 배분 확정 필요",
     },
     {
       id: "division:COO본부", level: "division", name: "브랜드 공헌이익 · 운영 효율", division: "COO본부", team: null, parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau SKU 공헌이익",
-      targets: {}, annualTarget: null, milestones: {}, h1Actual: null, note: "H2 브랜드만 이익목표 유지(H1 매출 110억 · OP 9억). 경영지원·CS는 운영 지표 — 본부 KPI 정의 확인 필요",
+      targets: {}, annualTarget: null, h1Actual: null, note: "H2 브랜드만 이익목표 유지(H1 매출 110억 · OP 9억). 경영지원·CS는 운영 지표 — 본부 KPI 정의 확인 필요",
     },
     {
       id: "division:CPO본부", level: "division", name: "제품(PB) 공헌이익", division: "CPO본부", team: null, parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리별 공헌이익",
-      targets: {}, annualTarget: null, milestones: {}, h1Actual: null, note: "H2 재설계상 CPO본부는 브랜드사업부 소속 — 본부 KPI 정의 확인 필요",
+      targets: {}, annualTarget: null, h1Actual: null, note: "H2 재설계상 CPO본부는 브랜드사업부 소속 — 본부 KPI 정의 확인 필요",
     },
     {
       id: teamGoalId("전략기획팀"), level: "team", name: "데이터 정합성 · KPI 정렬도", division: "CEO본부", team: "전략기획팀", parentId: "division:CEO본부",

@@ -101,11 +101,6 @@ export async function PATCH(request: Request) {
     if (!targets) return Response.json({ error: "목표값 형식이 올바르지 않습니다." }, { status: 400 });
     for (const [period, value] of Object.entries(targets)) filtered[`targets.${period}`] = value;
   }
-  if ("milestones" in updates) {
-    const milestones = parseTargets(updates.milestones);
-    if (!milestones) return Response.json({ error: "마일스톤 형식이 올바르지 않습니다." }, { status: 400 });
-    for (const [period, value] of Object.entries(milestones)) filtered[`milestones.${period}`] = value;
-  }
   for (const key of ["annualTarget", "h1Actual"] as const) {
     if (key in updates) {
       const value = parseNullableNumber(updates[key]);
