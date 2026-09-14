@@ -151,6 +151,18 @@ function useInlineText(initial: string) {
 
 // ─── 전사 · 본부 목표 (연간 + 분기 말 누적) ─────────────────
 
+/** 분기 말 누적 마일스톤 = 상반기 실적 + 해당 분기까지의 분기 목표 합. 실적도 이 누적값과 비교한다 */
+function computeMilestones(goal: GoalSetting): Record<Period, number | null> {
+  const out: Record<Period, number | null> = { "2026Q3": null, "2026Q4": null };
+  let running: number | null = goal.h1Actual ?? null;
+  for (const p of PERIODS) {
+    const q = goal.targets?.[p];
+    running = running != null && q != null ? running + q : null;
+    out[p] = running;
+  }
+  return out;
+}
+
 function AnnualGoalCard({
   goal,
   saveState,
@@ -163,12 +175,11 @@ function AnnualGoalCard({
   const [name, setName] = useInlineText(goal.name);
   const [note, setNote] = useInlineText(goal.note);
 
-  const q3 = goal.targets?.["2026Q3"];
-  const q4 = goal.targets?.["2026Q4"];
   const h1 = goal.h1Actual;
-  const q3Cum = h1 != null && q3 != null ? h1 + q3 : null;
-  const total = q3Cum != null && q4 != null ? q3Cum + q4 : null;
+  const milestones = computeMilestones(goal);
+  const total = milestones["2026Q4"];
   const diff = total != null && goal.annualTarget != null ? total - goal.annualTarget : null;
+  const blockCls = "rounded-lg border border-border bg-surface/30 px-3 py-2.5 space-y-2";
 
   return (
     <div className="rounded-lg border border-border bg-white px-4 py-3">
@@ -185,28 +196,42 @@ function AnnualGoalCard({
         <SourceSelect value={goal.source} onChange={(source) => onSave({ source })} />
         <SaveIndicator state={saveState} />
       </div>
-      <div className="flex items-center gap-x-4 gap-y-2 mt-2.5 flex-wrap">
-        <NumberField label="상반기 실적" value={h1} unit={goal.unit} scale="eok" onSave={(v) => onSave({ h1Actual: v })} />
-        {PERIODS.map((p) => (
-          <NumberField
-            key={p}
-            label={`${p.slice(-2)} 목표`}
-            value={goal.targets?.[p]}
-            unit={goal.unit}
-            scale="eok"
-            onSave={(v) => onSave({ targets: { [p]: v } })}
-          />
-        ))}
-        <NumberField label="연간 목표" value={goal.annualTarget} unit={goal.unit} scale="eok" onSave={(v) => onSave({ annualTarget: v })} />
-      </div>
-      <div className="flex items-center gap-3 mt-2 text-[11px] text-text-secondary flex-wrap">
-        <span>3Q 말 누적 <b className="text-text-primary tabular-nums">{formatEok(q3Cum, goal.unit)}</b></span>
-        <span>상반기 + 3Q + 4Q <b className="text-text-primary tabular-nums">{formatEok(total, goal.unit)}</b></span>
-        {diff !== null && Math.abs(diff) >= 1 && (
-          <span className={diff < 0 ? "text-red-600" : "text-amber-600"}>
-            연간 목표 대비 {diff > 0 ? "+" : ""}{formatEok(diff, goal.unit)}
-          </span>
-        )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
+        <div className={blockCls}>
+          <NumberField label="상반기 실적" value={h1} unit={goal.unit} scale="eok" onSave={(v) => onSave({ h1Actual: v })} />
+          <p className="text-[11px] text-text-secondary">누적 시작점</p>
+        </div>
+
+        {PERIODS.map((p) => {
+          const q = p.slice(-2);
+          return (
+            <div key={p} className={blockCls}>
+              <NumberField
+                label={`${q} 목표`}
+                value={goal.targets?.[p]}
+                unit={goal.unit}
+                scale="eok"
+                onSave={(v) => onSave({ targets: { [p]: v } })}
+              />
+              <div>
+                <p className="text-[11px] text-text-secondary">{q} 말 마일스톤</p>
+                <p className="text-xl font-bold text-accent tabular-nums leading-tight">{formatEok(milestones[p], goal.unit)}</p>
+                <p className="text-[10px] text-text-secondary/70 mt-0.5">누적 실적 비교 · 실적 연동 전</p>
+              </div>
+            </div>
+          );
+        })}
+
+        <div className={blockCls}>
+          <NumberField label="연간 목표" value={goal.annualTarget} unit={goal.unit} scale="eok" onSave={(v) => onSave({ annualTarget: v })} />
+          {diff !== null && Math.abs(diff) >= 10000000 ? (
+            <p className={`text-[11px] ${diff < 0 ? "text-red-600" : "text-amber-600"}`}>
+              4Q 말 마일스톤이 연간 목표 대비 {diff > 0 ? "+" : ""}{formatEok(diff, goal.unit)}
+            </p>
+          ) : (
+            <p className="text-[11px] text-text-secondary">{total != null ? "4Q 말 마일스톤과 일치" : "분기 목표 입력 후 비교"}</p>
+          )}
+        </div>
       </div>
       <input
         value={note}
@@ -522,7 +547,7 @@ export default function MetricSettings() {
       {tab === "top" && (
         <div className="space-y-5">
           <p className="text-xs text-text-secondary">
-            전사·본부는 연간 목표 기준입니다. 분기 목표는 <b>그 분기 금액</b>으로 넣으면 누적(상반기 실적 + 분기)은 자동 계산됩니다. 금액 단위: 억
+            전사·본부는 연간 목표 기준입니다. 분기 목표는 <b>그 분기 금액</b>으로 넣으면 <b>분기 말 마일스톤</b>(상반기 실적 + 분기 목표 누적)이 자동 계산되고, 실적은 이 누적값과 비교합니다. 금액 단위: 억
           </p>
           {needsAnnualFill && (
             <div className="flex items-center justify-between gap-3 p-3 bg-accent/5 border border-accent/30 rounded-lg flex-wrap">
@@ -565,7 +590,8 @@ export default function MetricSettings() {
           {divisionGoal && (
             <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-surface border border-border text-xs text-text-secondary flex-wrap">
               <span className="font-semibold text-text-primary">{division} · {divisionGoal.name}</span>
-              <span>{PERIOD_LABEL[period]} {formatEok(divisionGoal.targets?.[period], divisionGoal.unit)}</span>
+              <span>{PERIOD_LABEL[period]} 목표 {formatEok(divisionGoal.targets?.[period], divisionGoal.unit)}</span>
+              <span>{period.slice(-2)} 말 마일스톤 <b className="text-accent">{formatEok(computeMilestones(divisionGoal)[period], divisionGoal.unit)}</b></span>
               <span>연간 {formatEok(divisionGoal.annualTarget, divisionGoal.unit)}</span>
               <button onClick={() => setTab("top")} className="ml-auto text-accent hover:underline">본부 목표 수정</button>
             </div>
