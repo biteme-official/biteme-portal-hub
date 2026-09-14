@@ -32,6 +32,7 @@ import {
   type MetricKind,
   type MetricUnit,
 } from "./org-data";
+import MetricSettings from "./MetricSettings";
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -769,6 +770,7 @@ export default function PerformancePage() {
 
   const isAdmin = user?.role === "admin";
   const [view, setView] = useState<"member" | "admin">("admin");
+  const [adminTab, setAdminTab] = useState<"status" | "settings">("status");
   const [division, setDivision] = useState(DIVISIONS[0]);
   const [previewEmail, setPreviewEmail] = useState<string | null>(null);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
@@ -850,7 +852,9 @@ export default function PerformancePage() {
               ? targetPerson.scope
                 ? `담당 ${targetPerson.scope}`
                 : "지표와 액션 두 칸만 채우면 끝입니다"
-              : "본부 · 팀별 작성 현황과 지표 구성"}
+              : adminTab === "settings"
+                ? "본부 · 팀 · 개인별 지표와 데이터 출처 정리"
+                : "본부 · 팀별 작성 현황과 지표 구성"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -882,6 +886,23 @@ export default function PerformancePage() {
               관리자
             </button>
           </div>
+
+          {view === "admin" && (
+            <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
+              <button
+                onClick={() => setAdminTab("status")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${adminTab === "status" ? "bg-white text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"}`}
+              >
+                작성 현황
+              </button>
+              <button
+                onClick={() => setAdminTab("settings")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${adminTab === "settings" ? "bg-white text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"}`}
+              >
+                지표 설정
+              </button>
+            </div>
+          )}
 
           {view === "member" && (
             <>
@@ -955,6 +976,10 @@ export default function PerformancePage() {
             })}
           </div>
 
+          {adminTab === "settings" ? (
+            <MetricSettings division={division} />
+          ) : (
+          <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             <div className="bg-surface-card rounded-xl border border-border p-4">
               <p className="text-[11px] text-text-secondary font-medium mb-1">인원</p>
@@ -993,6 +1018,8 @@ export default function PerformancePage() {
               );
             })}
           </div>
+          </>
+          )}
         </>
       )}
     </div>
