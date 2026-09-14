@@ -101,6 +101,9 @@ export function parseTargets(raw: unknown): Targets | null {
   return out;
 }
 
+/** 팀 KPI가 전사 목표(매출·영업이익)와 동일한 팀 — 별도 목표값 없이 전사 목표를 그대로 본다 */
+export const TEAMS_USING_COMPANY_KPI = ["전략기획팀"];
+
 export function teamGoalId(team: string): string {
   return `team:${team}`;
 }
@@ -123,8 +126,8 @@ export function buildSeedGoals(): GoalSetting[] {
       note: "전사 마일스톤: Q1 6억 · Q2 5.7억 (실적) · Q3 4억 · Q4 5억",
     },
     {
-      id: teamGoalId("전략기획팀"), level: "team", name: "데이터 정합성 · KPI 정렬도", division: "CEO본부", team: "전략기획팀", parentId: null,
-      unit: "percent", source: "manual", sourceNote: "", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
+      id: teamGoalId("전략기획팀"), level: "team", name: "전사 목표와 동일 (매출 · 영업이익)", division: "CEO본부", team: "전략기획팀", parentId: null,
+      unit: "currency", source: "connectable", sourceNote: "전사 목표 참조", targets: {}, note: "팀 KPI = 전사 목표. 개인 지표는 별도",
     },
     {
       id: teamGoalId("해외팀"), level: "team", name: "해외 순매출", division: "CEO본부", team: "해외팀", parentId: "company:revenue",

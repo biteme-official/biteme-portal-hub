@@ -12,6 +12,7 @@ import {
   PERIODS,
   PERIOD_LABEL,
   teamGoalId,
+  TEAMS_USING_COMPANY_KPI,
   type MetricSetting,
   type MetricSource,
   type GoalSetting,
@@ -149,12 +150,25 @@ function useInlineText(initial: string) {
   return [text, setText] as const;
 }
 
-// ─── 전사 목표 (연간 + 분기 말 누적) ────────────────────────
+// ─── 전사 목표 · 팀 KPI (연간 + 분기 말 마일스톤) ───────────
 
-/** 분기 말 누적 마일스톤 = 상반기 실적 + 해당 분기까지의 분기 목표 합. 실적도 이 누적값과 비교한다 */
+/** 금액·건수는 누적되는 지표, 비율(%)은 분기별 수준 목표 */
+function isCumulative(goal: GoalSetting): boolean {
+  return goal.unit !== "percent";
+}
+
+/**
+ * 분기 말 마일스톤.
+ * 누적 지표: 상반기 실적(없으면 0) + 해당 분기까지의 분기 목표 합 — 실적도 이 누적값과 비교한다.
+ * 비율 지표: 해당 분기 목표 수준 그대로.
+ */
 function computeMilestones(goal: GoalSetting): Record<Period, number | null> {
   const out: Record<Period, number | null> = { "2026Q3": null, "2026Q4": null };
-  let running: number | null = goal.h1Actual ?? null;
+  if (!isCumulative(goal)) {
+    for (const p of PERIODS) out[p] = goal.targets?.[p] ?? null;
+    return out;
+  }
+  let running: number | null = goal.h1Actual ?? 0;
   for (const p of PERIODS) {
     const q = goal.targets?.[p];
     running = running != null && q != null ? running + q : null;
@@ -163,29 +177,35 @@ function computeMilestones(goal: GoalSetting): Record<Period, number | null> {
   return out;
 }
 
-function AnnualGoalCard({
+function MilestoneGoalCard({
   goal,
+  badge,
+  linkedCount,
   saveState,
   onSave,
 }: {
   goal: GoalSetting;
+  badge: string;
+  linkedCount?: number;
   saveState?: SaveState;
   onSave: (patch: Partial<GoalSetting>) => void;
 }) {
   const [name, setName] = useInlineText(goal.name);
   const [note, setNote] = useInlineText(goal.note);
 
+  const cumulative = isCumulative(goal);
   const h1 = goal.h1Actual;
   const milestones = computeMilestones(goal);
-  const total = milestones["2026Q4"];
-  const diff = total != null && goal.annualTarget != null ? total - goal.annualTarget : null;
+  const q4 = milestones["2026Q4"];
+  const diff = q4 != null && goal.annualTarget != null ? q4 - goal.annualTarget : null;
+  const diffThreshold = goal.unit === "currency" ? 10000000 : 0.0001;
   const blockCls = "rounded-lg border border-border bg-surface/30 px-3 py-2.5 space-y-2";
 
   return (
-    <div className="rounded-lg border border-border bg-white px-4 py-3">
+    <div className="rounded-xl border border-border bg-white px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded shrink-0">
-          <Target size={9} /> 전사
+          <Target size={9} /> {badge}
         </span>
         <input
           value={name}
@@ -193,13 +213,16 @@ function AnnualGoalCard({
           onBlur={() => name.trim() && name !== goal.name && onSave({ name })}
           className="flex-1 min-w-[10rem] px-2 py-1 text-sm font-semibold border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
         />
+        {linkedCount !== undefined && <span className="text-[11px] text-text-secondary">연결 지표 {linkedCount}개</span>}
         <SourceSelect value={goal.source} onChange={(source) => onSave({ source })} />
         <SaveIndicator state={saveState} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2.5">
         <div className={blockCls}>
           <NumberField label="상반기 실적" value={h1} unit={goal.unit} scale="eok" onSave={(v) => onSave({ h1Actual: v })} />
-          <p className="text-[11px] text-text-secondary">누적 시작점</p>
+          <p className="text-[11px] text-text-secondary">
+            {!cumulative ? "참고용" : h1 == null ? "미입력 — 하반기분만 누적" : "누적 시작점"}
+          </p>
         </div>
 
         {PERIODS.map((p) => {
@@ -214,9 +237,11 @@ function AnnualGoalCard({
                 onSave={(v) => onSave({ targets: { [p]: v } })}
               />
               <div>
-                <p className="text-[11px] text-text-secondary">{q} 말 마일스톤</p>
+                <p className="text-[11px] text-text-secondary">{cumulative ? `${q} 말 마일스톤` : `${q} 목표 수준`}</p>
                 <p className="text-xl font-bold text-accent tabular-nums leading-tight">{formatEok(milestones[p], goal.unit)}</p>
-                <p className="text-[10px] text-text-secondary/70 mt-0.5">누적 실적 비교 · 실적 연동 전</p>
+                <p className="text-[10px] text-text-secondary/70 mt-0.5">
+                  {cumulative ? "누적 실적 비교" : "분기 실적 비교"} · 실적 연동 전
+                </p>
               </div>
             </div>
           );
@@ -224,12 +249,12 @@ function AnnualGoalCard({
 
         <div className={blockCls}>
           <NumberField label="연간 목표" value={goal.annualTarget} unit={goal.unit} scale="eok" onSave={(v) => onSave({ annualTarget: v })} />
-          {diff !== null && Math.abs(diff) >= 10000000 ? (
+          {diff !== null && Math.abs(diff) >= diffThreshold ? (
             <p className={`text-[11px] ${diff < 0 ? "text-red-600" : "text-amber-600"}`}>
-              4Q 말 마일스톤이 연간 목표 대비 {diff > 0 ? "+" : ""}{formatEok(diff, goal.unit)}
+              {cumulative ? "4Q 말 마일스톤" : "4Q 목표"}이 연간 목표 대비 {diff > 0 ? "+" : ""}{formatEok(diff, goal.unit)}
             </p>
           ) : (
-            <p className="text-[11px] text-text-secondary">{total != null ? "4Q 말 마일스톤과 일치" : "분기 목표 입력 후 비교"}</p>
+            <p className="text-[11px] text-text-secondary">{q4 != null && goal.annualTarget != null ? "4Q와 일치" : "분기 목표 입력 후 비교"}</p>
           )}
         </div>
       </div>
@@ -240,59 +265,6 @@ function AnnualGoalCard({
         placeholder="근거 · 확정 필요 사항"
         className="w-full mt-2.5 px-2 py-1.5 text-xs border border-border rounded-md bg-white text-text-secondary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
       />
-    </div>
-  );
-}
-
-// ─── 팀 KPI (분기 단독) ─────────────────────────────────────
-
-function TeamGoalCard({
-  goal,
-  period,
-  linkedCount,
-  saveState,
-  onSave,
-}: {
-  goal: GoalSetting;
-  period: Period;
-  linkedCount: number;
-  saveState?: SaveState;
-  onSave: (patch: Partial<GoalSetting>) => void;
-}) {
-  const [name, setName] = useInlineText(goal.name);
-  const [note, setNote] = useInlineText(goal.note);
-
-  return (
-    <div className="bg-surface-card rounded-xl border border-border px-4 py-3.5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Users size={14} className="text-accent shrink-0" />
-        <span className="text-sm font-bold text-text-primary shrink-0">{goal.team}</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => name.trim() && name !== goal.name && onSave({ name })}
-          className="flex-1 min-w-[10rem] px-2 py-1 text-sm border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
-        />
-        <span className="text-[11px] text-text-secondary">연결 지표 {linkedCount}개</span>
-        <SaveIndicator state={saveState} />
-      </div>
-      <div className="flex items-center gap-x-4 gap-y-2 mt-2.5 flex-wrap">
-        <NumberField
-          label={`${PERIOD_LABEL[period]} 목표`}
-          value={goal.targets?.[period]}
-          unit={goal.unit}
-          scale="eok"
-          onSave={(v) => onSave({ targets: { [period]: v } })}
-        />
-        <SourceSelect value={goal.source} onChange={(source) => onSave({ source })} />
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => note !== goal.note && onSave({ note })}
-          placeholder="근거 · 확정 필요 사항"
-          className="flex-1 min-w-[12rem] px-2 py-1.5 text-xs border border-border rounded-md bg-white text-text-secondary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
-        />
-      </div>
     </div>
   );
 }
@@ -346,7 +318,11 @@ function MetricRow({
           className="flex-1 min-w-[10rem] px-2 py-1.5 text-xs border border-border rounded-md bg-white text-text-secondary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
         />
         <select value={parentId} onChange={(e) => onSave({ parentGoalId: e.target.value })} className={selectCls} title="연결 KPI">
-          {teamGoals.map((g) => <option key={g.id} value={g.id}>↑ {g.team} · {g.name}</option>)}
+          {teamGoals.map((g) => (
+            <option key={g.id} value={g.id}>
+              ↑ {g.team} · {g.team && TEAMS_USING_COMPANY_KPI.includes(g.team) ? "전사 목표와 동일" : g.name}
+            </option>
+          ))}
         </select>
         <select value={metric.ownerEmail} onChange={(e) => onSave({ ownerEmail: e.target.value })} className={selectCls} title="담당자 변경">
           {DIVISIONS.map((div) => (
@@ -535,11 +511,13 @@ export default function MetricSettings() {
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
             </div>
           )}
-          <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 ml-auto">
-            {PERIODS.map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} className={pillCls(period === p)}>{PERIOD_LABEL[p]}</button>
-            ))}
-          </div>
+          {tab === "person" && (
+            <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 ml-auto">
+              {PERIODS.map((p) => (
+                <button key={p} onClick={() => setPeriod(p)} className={pillCls(period === p)}>{PERIOD_LABEL[p]}</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -569,7 +547,7 @@ export default function MetricSettings() {
               <h3 className="text-sm font-bold text-text-primary">{GOAL_LEVEL_LABEL.company} 목표</h3>
             </div>
             {companyGoals.map((g) => (
-              <AnnualGoalCard key={g.id} goal={g} saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
+              <MilestoneGoalCard key={g.id} goal={g} badge="전사" saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
             ))}
           </section>
         </div>
@@ -577,23 +555,45 @@ export default function MetricSettings() {
 
       {tab === "team" && (
         <div className="space-y-3">
-          {companyGoals.map((g) => (
-            <div key={g.id} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-surface border border-border text-xs text-text-secondary flex-wrap">
-              <span className="font-semibold text-text-primary">{g.name}</span>
-              <span>{PERIOD_LABEL[period]} 목표 {formatEok(g.targets?.[period], g.unit)}</span>
-              <span>{period.slice(-2)} 말 마일스톤 <b className="text-accent">{formatEok(computeMilestones(g)[period], g.unit)}</b></span>
-              <span>연간 {formatEok(g.annualTarget, g.unit)}</span>
-              <button onClick={() => setTab("top")} className="ml-auto text-accent hover:underline">전사 목표 수정</button>
-            </div>
-          ))}
+          <p className="text-xs text-text-secondary">
+            금액·건수 KPI는 분기 목표를 넣으면 분기 말 마일스톤(상반기 실적 + 분기 누적)이 계산되고, 비율(%) KPI는 분기별 목표 수준으로 봅니다. 금액 단위: 억
+          </p>
           {divTeams.map((t) => {
             const g = teamGoals.find((x) => x.team === t);
             if (!g) return null;
+            if (TEAMS_USING_COMPANY_KPI.includes(t)) {
+              return (
+                <div key={g.id} className="rounded-xl border border-border bg-white px-4 py-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded">
+                      <Target size={9} /> {t}
+                    </span>
+                    <span className="text-sm font-semibold text-text-primary">전사 목표와 동일</span>
+                    <span className="text-[11px] text-text-secondary">연결 지표 {linkedCount(g.id)}개</span>
+                    <button onClick={() => setTab("top")} className="ml-auto text-xs text-accent hover:underline">전사 목표 수정</button>
+                  </div>
+                  {companyGoals.map((c) => {
+                    const ms = computeMilestones(c);
+                    return (
+                      <div key={c.id} className="flex items-center gap-4 px-3 py-2 rounded-lg bg-surface/40 border border-border/60 text-xs text-text-secondary flex-wrap">
+                        <span className="font-semibold text-text-primary w-24">{c.name}</span>
+                        {PERIODS.map((p) => (
+                          <span key={p}>
+                            {p.slice(-2)} {formatEok(c.targets?.[p], c.unit)} · 말 마일스톤 <b className="text-accent tabular-nums">{formatEok(ms[p], c.unit)}</b>
+                          </span>
+                        ))}
+                        <span>연간 {formatEok(c.annualTarget, c.unit)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
             return (
-              <TeamGoalCard
+              <MilestoneGoalCard
                 key={g.id}
                 goal={g}
-                period={period}
+                badge={t}
                 linkedCount={linkedCount(g.id)}
                 saveState={saveStates[g.id]}
                 onSave={(p) => saveGoal(g.id, p)}
