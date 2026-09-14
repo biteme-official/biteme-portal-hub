@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, Users, User, Database, Loader2, AlertCircle, Target, Building2 } from "lucide-react";
+import { Users, User, Database, Loader2, AlertCircle, Target, Building2, ChevronDown } from "lucide-react";
 import { PEOPLE, TEAM_ORDER, DIVISIONS, type MetricUnit } from "./org-data";
 import {
   SOURCE_ORDER,
@@ -9,6 +9,8 @@ import {
   CADENCE_ORDER,
   CADENCE_LABEL,
   GOAL_LEVEL_LABEL,
+  PERIODS,
+  PERIOD_LABEL,
   teamGoalId,
   type MetricSetting,
   type MetricSource,
@@ -30,20 +32,26 @@ const SOURCE_DESC: Record<MetricSource, string> = {
   manual: "시스템 데이터 없음 — 입력 주체 결정 필요",
 };
 
+type Tab = "top" | "team" | "person";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "top", label: "전사 · 본부 목표" },
+  { key: "team", label: "팀 KPI" },
+  { key: "person", label: "개인 지표" },
+];
+
 type SaveState = "saving" | "saved" | "error";
 
 const selectBase = "px-2 py-1.5 text-xs border rounded-md focus:outline-none focus:border-accent";
 const selectCls = `${selectBase} border-border bg-white text-text-primary`;
+const pillCls = (on: boolean) =>
+  `px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${on ? "bg-white text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"}`;
 
-function formatTarget(v: number, unit: MetricUnit): string {
-  if (unit === "currency") {
-    if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
-    if (Math.abs(v) >= 10000) return `${Math.round(v / 10000).toLocaleString()}만`;
-    return `${v.toLocaleString()}원`;
-  }
-  if (unit === "percent") return `${v}%`;
-  return `${v.toLocaleString()}건`;
-}
+/** 금액 입력 단위 — 전사·본부·팀 목표는 억, 개인 지표는 만원 */
+type Scale = "eok" | "man";
+const SCALE: Record<Scale, { factor: number; suffix: string }> = {
+  eok: { factor: 100000000, suffix: "억" },
+  man: { factor: 10000, suffix: "만원" },
+};
 
 function SaveIndicator({ state }: { state?: SaveState }) {
   return (
@@ -71,47 +79,130 @@ function SourceTally({ items }: { items: { source: MetricSource }[] }) {
   );
 }
 
-/** 분기 목표 입력 — 비우면 미확정(null) */
-function TargetInput({
+function SourceSelect({ value, onChange }: { value: MetricSource; onChange: (s: MetricSource) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value as MetricSource)} className={`${selectBase} font-semibold ${SOURCE_STYLE[value]}`}>
+      {SOURCE_ORDER.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}
+    </select>
+  );
+}
+
+/** 숫자 입력 — 금액은 억/만원 단위로 입력받아 원으로 저장. 비우면 null(미정) */
+function NumberField({
+  label,
   value,
   unit,
-  period,
+  scale,
   onSave,
 }: {
+  label?: string;
   value: number | null | undefined;
   unit: MetricUnit;
-  period: Period;
+  scale: Scale;
   onSave: (v: number | null) => void;
 }) {
-  const [text, setText] = useState(value === null || value === undefined ? "" : String(value));
-  useEffect(() => setText(value === null || value === undefined ? "" : String(value)), [value, period]);
+  const factor = unit === "currency" ? SCALE[scale].factor : 1;
+  const suffix = unit === "currency" ? SCALE[scale].suffix : unit === "percent" ? "%" : "건";
+  const toText = (v: number | null | undefined) =>
+    v === null || v === undefined ? "" : String(Math.round((v / factor) * 100) / 100);
+
+  const [text, setText] = useState(toText(value));
+  useEffect(() => setText(toText(value)), [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function commit() {
-    const parsed = text.trim() === "" ? null : Number(text);
-    if (parsed !== null && Number.isNaN(parsed)) return;
-    if (parsed === (value ?? null)) return;
-    onSave(parsed);
+    const n = text.trim() === "" ? null : Number(text);
+    if (n !== null && Number.isNaN(n)) return;
+    const next = n === null ? null : Math.round(n * factor);
+    if (next === (value ?? null)) return;
+    onSave(next);
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        inputMode="decimal"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        placeholder="목표 미정"
-        className="w-28 px-2 py-1.5 text-xs text-right tabular-nums border border-border rounded-md bg-white text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
-      />
-      <span className="w-12 text-[10px] text-text-secondary tabular-nums">
-        {value !== null && value !== undefined ? formatTarget(value, unit) : ""}
+    <label className="flex items-center gap-1.5">
+      {label && <span className="text-[11px] text-text-secondary whitespace-nowrap">{label}</span>}
+      <span className="relative">
+        <input
+          type="number"
+          inputMode="decimal"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          placeholder="미정"
+          className="w-24 pl-2 pr-9 py-1.5 text-xs text-right tabular-nums border border-border rounded-md bg-white text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
+        />
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-text-secondary pointer-events-none">{suffix}</span>
       </span>
+    </label>
+  );
+}
+
+function formatEok(v: number | null | undefined, unit: MetricUnit): string {
+  if (v === null || v === undefined) return "미정";
+  if (unit === "currency") return `${Math.round((v / 100000000) * 10) / 10}억`;
+  return unit === "percent" ? `${v}%` : `${v.toLocaleString()}건`;
+}
+
+/** 이름 + 비고 인라인 편집 공통 */
+function useInlineText(initial: string) {
+  const [text, setText] = useState(initial);
+  useEffect(() => setText(initial), [initial]);
+  return [text, setText] as const;
+}
+
+// ─── 전사 · 본부 목표 (연간 + 분기 말 누적) ─────────────────
+
+function AnnualGoalCard({
+  goal,
+  saveState,
+  onSave,
+}: {
+  goal: GoalSetting;
+  saveState?: SaveState;
+  onSave: (patch: Partial<GoalSetting>) => void;
+}) {
+  const [name, setName] = useInlineText(goal.name);
+  const [note, setNote] = useInlineText(goal.note);
+
+  return (
+    <div className="rounded-lg border border-border bg-white px-4 py-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded shrink-0">
+          <Target size={9} /> {goal.level === "company" ? "전사" : goal.division}
+        </span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => name.trim() && name !== goal.name && onSave({ name })}
+          className="flex-1 min-w-[10rem] px-2 py-1 text-sm font-semibold border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
+        />
+        <SourceSelect value={goal.source} onChange={(source) => onSave({ source })} />
+        <SaveIndicator state={saveState} />
+      </div>
+      <div className="flex items-center gap-x-4 gap-y-2 mt-2.5 flex-wrap">
+        <NumberField label="상반기 실적" value={goal.h1Actual} unit={goal.unit} scale="eok" onSave={(v) => onSave({ h1Actual: v })} />
+        <NumberField
+          label="3Q 말 누적"
+          value={goal.milestones?.["2026Q3"]}
+          unit={goal.unit}
+          scale="eok"
+          onSave={(v) => onSave({ milestones: { "2026Q3": v } })}
+        />
+        <NumberField label="연간 목표" value={goal.annualTarget} unit={goal.unit} scale="eok" onSave={(v) => onSave({ annualTarget: v })} />
+      </div>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={() => note !== goal.note && onSave({ note })}
+        placeholder="근거 · 확정 필요 사항"
+        className="w-full mt-2.5 px-2 py-1.5 text-xs border border-border rounded-md bg-white text-text-secondary placeholder:text-text-secondary/40 focus:outline-none focus:border-accent"
+      />
     </div>
   );
 }
 
-function GoalCard({
+// ─── 팀 KPI (분기 단독) ─────────────────────────────────────
+
+function TeamGoalCard({
   goal,
   period,
   linkedCount,
@@ -120,46 +211,36 @@ function GoalCard({
 }: {
   goal: GoalSetting;
   period: Period;
-  linkedCount?: number;
+  linkedCount: number;
   saveState?: SaveState;
   onSave: (patch: Partial<GoalSetting>) => void;
 }) {
-  const [name, setName] = useState(goal.name);
-  const [note, setNote] = useState(goal.note);
-  useEffect(() => setName(goal.name), [goal.name]);
-  useEffect(() => setNote(goal.note), [goal.note]);
+  const [name, setName] = useInlineText(goal.name);
+  const [note, setNote] = useInlineText(goal.note);
 
   return (
-    <div className="rounded-lg border border-accent/30 bg-accent/5 px-3.5 py-3">
+    <div className="bg-surface-card rounded-xl border border-border px-4 py-3.5">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-white border border-accent/30 px-1.5 py-0.5 rounded">
-          <Target size={9} /> {GOAL_LEVEL_LABEL[goal.level]} KPI
-        </span>
+        <Users size={14} className="text-accent shrink-0" />
+        <span className="text-sm font-bold text-text-primary shrink-0">{goal.team}</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => name.trim() && name !== goal.name && onSave({ name })}
-          className="flex-1 min-w-[10rem] px-2 py-1 text-sm font-semibold border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
+          className="flex-1 min-w-[10rem] px-2 py-1 text-sm border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
         />
-        {linkedCount !== undefined && (
-          <span className="text-[11px] text-text-secondary">연결 지표 {linkedCount}개</span>
-        )}
+        <span className="text-[11px] text-text-secondary">연결 지표 {linkedCount}개</span>
         <SaveIndicator state={saveState} />
       </div>
-      <div className="flex items-center gap-2 mt-2 flex-wrap">
-        <TargetInput
+      <div className="flex items-center gap-x-4 gap-y-2 mt-2.5 flex-wrap">
+        <NumberField
+          label={`${PERIOD_LABEL[period]} 목표`}
           value={goal.targets?.[period]}
           unit={goal.unit}
-          period={period}
+          scale="eok"
           onSave={(v) => onSave({ targets: { [period]: v } })}
         />
-        <select
-          value={goal.source}
-          onChange={(e) => onSave({ source: e.target.value as MetricSource })}
-          className={`${selectBase} font-semibold ${SOURCE_STYLE[goal.source]}`}
-        >
-          {SOURCE_ORDER.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}
-        </select>
+        <SourceSelect value={goal.source} onChange={(source) => onSave({ source })} />
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -171,6 +252,8 @@ function GoalCard({
     </div>
   );
 }
+
+// ─── 개인 지표 ──────────────────────────────────────────────
 
 function MetricRow({
   metric,
@@ -185,12 +268,8 @@ function MetricRow({
   saveState?: SaveState;
   onSave: (patch: Partial<MetricSetting>) => void;
 }) {
-  const [name, setName] = useState(metric.name);
-  const [note, setNote] = useState(metric.sourceNote);
-
-  useEffect(() => setName(metric.name), [metric.name]);
-  useEffect(() => setNote(metric.sourceNote), [metric.sourceNote]);
-
+  const [name, setName] = useInlineText(metric.name);
+  const [note, setNote] = useInlineText(metric.sourceNote);
   const parentId = metric.parentGoalId ?? teamGoalId(metric.team);
 
   return (
@@ -202,22 +281,16 @@ function MetricRow({
           onBlur={() => name.trim() && name !== metric.name && onSave({ name })}
           className="flex-1 min-w-[10rem] px-2 py-1.5 text-[13px] border border-transparent hover:border-border rounded-md bg-transparent text-text-primary focus:outline-none focus:border-accent focus:bg-white"
         />
-        <TargetInput
+        <NumberField
           value={metric.targets?.[period]}
           unit={metric.unit}
-          period={period}
+          scale="man"
           onSave={(v) => onSave({ targets: { [period]: v } })}
         />
         <select value={metric.cadence} onChange={(e) => onSave({ cadence: e.target.value as MetricSetting["cadence"] })} className={selectCls}>
           {CADENCE_ORDER.map((c) => <option key={c} value={c}>{CADENCE_LABEL[c]}</option>)}
         </select>
-        <select
-          value={metric.source}
-          onChange={(e) => onSave({ source: e.target.value as MetricSource })}
-          className={`${selectBase} font-semibold ${SOURCE_STYLE[metric.source]}`}
-        >
-          {SOURCE_ORDER.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}
-        </select>
+        <SourceSelect value={metric.source} onChange={(source) => onSave({ source })} />
         <SaveIndicator state={saveState} />
       </div>
       <div className="flex items-center gap-2 flex-wrap pl-2">
@@ -245,93 +318,7 @@ function MetricRow({
   );
 }
 
-function TeamSettingsCard({
-  team,
-  period,
-  goal,
-  teamGoals,
-  metrics,
-  linkedCount,
-  saveStates,
-  onSaveMetric,
-  onSaveGoal,
-}: {
-  team: string;
-  period: Period;
-  goal?: GoalSetting;
-  teamGoals: GoalSetting[];
-  metrics: MetricSetting[];
-  linkedCount: number;
-  saveStates: Record<string, SaveState>;
-  onSaveMetric: (id: string, patch: Partial<MetricSetting>) => void;
-  onSaveGoal: (id: string, patch: Partial<GoalSetting>) => void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const owners = [...new Set(metrics.map((m) => m.ownerEmail))];
-
-  return (
-    <div className="bg-surface-card rounded-xl border border-border overflow-hidden">
-      <div
-        className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-surface/50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-            <Users size={16} className="text-accent" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-bold text-text-primary">{team}</span>
-              <span className="text-[11px] text-text-secondary bg-surface px-2 py-0.5 rounded-full">
-                지표 {metrics.length}개
-              </span>
-              {goal && <span className="text-[11px] text-text-secondary">KPI · {goal.name}</span>}
-            </div>
-            <div className="mt-1"><SourceTally items={metrics} /></div>
-          </div>
-        </div>
-        {expanded ? <ChevronUp size={16} className="text-text-secondary" /> : <ChevronDown size={16} className="text-text-secondary" />}
-      </div>
-
-      {expanded && (
-        <div className="border-t border-border bg-surface/20 px-3 py-3 space-y-2">
-          {goal && (
-            <GoalCard
-              goal={goal}
-              period={period}
-              linkedCount={linkedCount}
-              saveState={saveStates[goal.id]}
-              onSave={(patch) => onSaveGoal(goal.id, patch)}
-            />
-          )}
-          {owners.map((email) => {
-            const own = metrics.filter((m) => m.ownerEmail === email);
-            return (
-              <div key={email} className="bg-white rounded-lg border border-border overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 bg-surface/40 border-b border-border/60 flex-wrap">
-                  <User size={13} className="text-accent" />
-                  <span className="text-sm font-semibold text-text-primary">{own[0].ownerName}</span>
-                  <span className="text-[11px] text-text-secondary">{own.length}개</span>
-                  <div className="ml-auto"><SourceTally items={own} /></div>
-                </div>
-                {own.map((m) => (
-                  <MetricRow
-                    key={m.id}
-                    metric={m}
-                    period={period}
-                    teamGoals={teamGoals}
-                    saveState={saveStates[m.id]}
-                    onSave={(patch) => onSaveMetric(m.id, patch)}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// ─── Main ───────────────────────────────────────────────────
 
 async function patchJson(url: string, body: unknown): Promise<boolean> {
   const res = await fetch(url, {
@@ -342,7 +329,21 @@ async function patchJson(url: string, body: unknown): Promise<boolean> {
   return res.ok;
 }
 
-export default function MetricSettings({ division, period }: { division: string; period: Period }) {
+function mergeGoal(g: GoalSetting, patch: Partial<GoalSetting>): GoalSetting {
+  return {
+    ...g,
+    ...patch,
+    targets: patch.targets ? { ...g.targets, ...patch.targets } : g.targets,
+    milestones: patch.milestones ? { ...g.milestones, ...patch.milestones } : g.milestones,
+  };
+}
+
+export default function MetricSettings() {
+  const [tab, setTab] = useState<Tab>("top");
+  const [division, setDivision] = useState(DIVISIONS[0]);
+  const [team, setTeam] = useState<string>(TEAM_ORDER[DIVISIONS[0]]?.[0] ?? "");
+  const [period, setPeriod] = useState<Period>("2026Q3");
+
   const [metrics, setMetrics] = useState<MetricSetting[] | null>(null);
   const [goals, setGoals] = useState<GoalSetting[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -364,9 +365,14 @@ export default function MetricSettings({ division, period }: { division: string;
 
   useEffect(() => { load(); }, [load]);
 
+  function changeDivision(d: string) {
+    setDivision(d);
+    setTeam(TEAM_ORDER[d]?.[0] ?? "");
+  }
+
+  /** 없는 것만 등록 — 지표는 비어 있을 때만, 목표는 없는 문서·빈 필드만 채움 */
   async function seed() {
     setSeeding(true);
-    // 비어 있는 컬렉션만 채워진다 (이미 있으면 409)
     const results = await Promise.all([
       fetch("/api/performance/metrics", { method: "POST" }),
       fetch("/api/performance/goals", { method: "POST" }),
@@ -384,7 +390,6 @@ export default function MetricSettings({ division, period }: { division: string;
       ? { ...m, ...local, targets: patch.targets ? { ...m.targets, ...patch.targets } : m.targets }
       : m)) ?? ms);
     setSaveStates((s) => ({ ...s, [id]: "saving" }));
-
     if (!(await patchJson("/api/performance/metrics", { id, ...patch }))) {
       setMetrics(prev);
       setSaveStates((s) => ({ ...s, [id]: "error" }));
@@ -395,11 +400,8 @@ export default function MetricSettings({ division, period }: { division: string;
 
   async function saveGoal(id: string, patch: Partial<GoalSetting>) {
     const prev = goals;
-    setGoals((gs) => gs.map((g) => (g.id === id
-      ? { ...g, ...patch, targets: patch.targets ? { ...g.targets, ...patch.targets } : g.targets }
-      : g)));
+    setGoals((gs) => gs.map((g) => (g.id === id ? mergeGoal(g, patch) : g)));
     setSaveStates((s) => ({ ...s, [id]: "saving" }));
-
     if (!(await patchJson("/api/performance/goals", { id, ...patch }))) {
       setGoals(prev);
       setSaveStates((s) => ({ ...s, [id]: "error" }));
@@ -424,12 +426,9 @@ export default function MetricSettings({ division, period }: { division: string;
           <p className="text-sm text-red-600">{error}</p>
         ) : (
           <>
-            <p className="text-sm text-text-secondary">
-              {metrics.length === 0 ? "등록된 지표가 없습니다" : "등록된 KPI 목표가 없습니다"}
-            </p>
+            <p className="text-sm text-text-secondary">등록된 지표 · 목표가 없습니다</p>
             <p className="text-xs text-text-secondary/60 mt-1 mb-4">
               H2 KPI 재설계 기준 전사·본부·팀 목표와 주간보고록 기반 지표 {PEOPLE.flatMap((p) => p.metrics).length}개를 등록합니다
-              <br />이미 등록된 쪽은 건드리지 않습니다
             </p>
             <button
               onClick={seed}
@@ -446,74 +445,183 @@ export default function MetricSettings({ division, period }: { division: string;
   }
 
   const companyGoals = goals.filter((g) => g.level === "company");
-  const divisionGoal = goals.find((g) => g.level === "division" && g.division === division);
+  const divisionGoals = goals.filter((g) => g.level === "division");
   const teamGoals = goals.filter((g) => g.level === "team");
-  const divMetrics = metrics.filter((m) => m.division === division);
+  const divisionGoal = divisionGoals.find((g) => g.division === division);
+  const needsAnnualFill = [...companyGoals, ...divisionGoals].some((g) => !("annualTarget" in g));
   const linkedCount = (goalId: string) =>
     metrics.filter((m) => (m.parentGoalId ?? teamGoalId(m.team)) === goalId).length;
 
+  const divTeams = TEAM_ORDER[division] ?? [];
+  const teamMetrics = metrics.filter((m) => m.team === team);
+  const owners = [...new Set(teamMetrics.map((m) => m.ownerEmail))];
+
   return (
     <>
+      {/* 단계 탭 */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === t.key ? "border-accent text-accent" : "border-transparent text-text-secondary hover:text-text-primary"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {error && (
         <div className="flex items-center gap-2 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           <AlertCircle size={13} /> {error}
         </div>
       )}
 
-      <div className="bg-surface-card rounded-xl border border-border p-4 mb-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <Building2 size={14} className="text-accent" />
-          <span className="text-sm font-bold text-text-primary">전사 KPI</span>
-        </div>
-        {companyGoals.map((g) => (
-          <GoalCard key={g.id} goal={g} period={period} saveState={saveStates[g.id]} onSave={(patch) => saveGoal(g.id, patch)} />
-        ))}
-      </div>
-
-      {divisionGoal && (
-        <div className="bg-surface-card rounded-xl border border-border p-4 mb-5">
-          <GoalCard
-            goal={divisionGoal}
-            period={period}
-            saveState={saveStates[divisionGoal.id]}
-            onSave={(patch) => saveGoal(divisionGoal.id, patch)}
-          />
+      {/* 본부 · 팀 · 분기 필터 */}
+      {tab !== "top" && (
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
+            {DIVISIONS.map((d) => (
+              <button key={d} onClick={() => changeDivision(d)} className={pillCls(division === d)}>{d}</button>
+            ))}
+          </div>
+          {tab === "person" && (
+            <div className="relative">
+              <select
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                className="pl-3 pr-8 py-1.5 text-xs font-medium border border-border rounded-lg bg-white text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
+              >
+                {divTeams.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+            </div>
+          )}
+          <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 ml-auto">
+            {PERIODS.map((p) => (
+              <button key={p} onClick={() => setPeriod(p)} className={pillCls(period === p)}>{PERIOD_LABEL[p]}</button>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {SOURCE_ORDER.map((s) => (
-          <div key={s} className="bg-surface-card rounded-xl border border-border p-4">
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SOURCE_STYLE[s]}`}>{SOURCE_LABEL[s]}</span>
-            <p className="text-lg font-bold text-text-primary tabular-nums mt-1.5">
-              {divMetrics.filter((m) => m.source === s).length}개
-            </p>
-            <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">{SOURCE_DESC[s]}</p>
-          </div>
-        ))}
-      </div>
+      {tab === "top" && (
+        <div className="space-y-5">
+          <p className="text-xs text-text-secondary">
+            전사·본부는 연간 목표 기준입니다. 실적은 연초부터 누적으로 가져오므로 3Q는 <b>분기 말 누적 마일스톤</b>을 넣고, 4Q 말은 연간 목표와 같습니다. 금액 단위: 억
+          </p>
+          {needsAnnualFill && (
+            <div className="flex items-center justify-between gap-3 p-3 bg-accent/5 border border-accent/30 rounded-lg flex-wrap">
+              <span className="text-xs text-text-primary">
+                연간 목표 · 3Q 누적 · 상반기 실적 칸이 아직 없습니다. H2 KPI 기준값(매출 200억 / 영업이익 20억 등)을 <b>비어 있는 칸에만</b> 채웁니다.
+              </span>
+              <button
+                onClick={seed}
+                disabled={seeding}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white rounded-md text-xs font-medium hover:bg-accent/90 disabled:opacity-50"
+              >
+                {seeding && <Loader2 size={12} className="animate-spin" />}
+                기준값 채우기
+              </button>
+            </div>
+          )}
+          <section className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Building2 size={14} className="text-accent" />
+              <h3 className="text-sm font-bold text-text-primary">{GOAL_LEVEL_LABEL.company} 목표</h3>
+            </div>
+            {companyGoals.map((g) => (
+              <AnnualGoalCard key={g.id} goal={g} saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
+            ))}
+          </section>
+          <section className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Users size={14} className="text-accent" />
+              <h3 className="text-sm font-bold text-text-primary">{GOAL_LEVEL_LABEL.division} 목표</h3>
+            </div>
+            {divisionGoals.map((g) => (
+              <AnnualGoalCard key={g.id} goal={g} saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
+            ))}
+          </section>
+        </div>
+      )}
 
-      <div className="space-y-3">
-        {(TEAM_ORDER[division] ?? []).map((team) => {
-          const teamMetrics = divMetrics.filter((m) => m.team === team);
-          const goal = teamGoals.find((g) => g.team === team);
-          if (teamMetrics.length === 0 && !goal) return null;
-          return (
-            <TeamSettingsCard
-              key={team}
-              team={team}
-              period={period}
-              goal={goal}
-              teamGoals={teamGoals}
-              metrics={teamMetrics}
-              linkedCount={goal ? linkedCount(goal.id) : 0}
-              saveStates={saveStates}
-              onSaveMetric={saveMetric}
-              onSaveGoal={saveGoal}
-            />
-          );
-        })}
-      </div>
+      {tab === "team" && (
+        <div className="space-y-3">
+          {divisionGoal && (
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-surface border border-border text-xs text-text-secondary flex-wrap">
+              <span className="font-semibold text-text-primary">{division} · {divisionGoal.name}</span>
+              <span>3Q 말 누적 {formatEok(divisionGoal.milestones?.["2026Q3"], divisionGoal.unit)}</span>
+              <span>연간 {formatEok(divisionGoal.annualTarget, divisionGoal.unit)}</span>
+              <button onClick={() => setTab("top")} className="ml-auto text-accent hover:underline">본부 목표 수정</button>
+            </div>
+          )}
+          {divTeams.map((t) => {
+            const g = teamGoals.find((x) => x.team === t);
+            if (!g) return null;
+            return (
+              <TeamGoalCard
+                key={g.id}
+                goal={g}
+                period={period}
+                linkedCount={linkedCount(g.id)}
+                saveState={saveStates[g.id]}
+                onSave={(p) => saveGoal(g.id, p)}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {tab === "person" && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {SOURCE_ORDER.map((s) => (
+              <div key={s} className="bg-surface-card rounded-xl border border-border p-3.5">
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${SOURCE_STYLE[s]}`}>{SOURCE_LABEL[s]}</span>
+                <p className="text-lg font-bold text-text-primary tabular-nums mt-1">
+                  {teamMetrics.filter((m) => m.source === s).length}개
+                </p>
+                <p className="text-[11px] text-text-secondary leading-snug">{SOURCE_DESC[s]}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-text-secondary">
+            {PERIOD_LABEL[period]} 목표 입력 · 금액 단위: 만원 · 연결 KPI 기본값은 담당 팀 KPI
+          </p>
+
+          {owners.length === 0 && (
+            <div className="bg-surface-card rounded-xl border border-border py-10 text-center text-sm text-text-secondary">
+              {team}에 등록된 지표가 없습니다
+            </div>
+          )}
+
+          {owners.map((email) => {
+            const own = teamMetrics.filter((m) => m.ownerEmail === email);
+            return (
+              <div key={email} className="bg-surface-card rounded-xl border border-border overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-surface/40 border-b border-border/60 flex-wrap">
+                  <User size={13} className="text-accent" />
+                  <span className="text-sm font-semibold text-text-primary">{own[0].ownerName}</span>
+                  <span className="text-[11px] text-text-secondary">{own.length}개</span>
+                  <div className="ml-auto"><SourceTally items={own} /></div>
+                </div>
+                {own.map((m) => (
+                  <MetricRow
+                    key={m.id}
+                    metric={m}
+                    period={period}
+                    teamGoals={teamGoals}
+                    saveState={saveStates[m.id]}
+                    onSave={(p) => saveMetric(m.id, p)}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
