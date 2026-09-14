@@ -107,7 +107,7 @@ export function teamGoalId(team: string): string {
 
 const EOK = 100000000;
 
-/** H2 KPI 재설계(2026-08-13) 기준 초기 목표. 사업부별 배분이 미확정이라 본부·팀 목표값은 비워 둔다. */
+/** H2 KPI 재설계(2026-08-13) 기준 초기 목표. 본부 목표는 두지 않고 팀 KPI를 전사 목표에 직접 연결한다 (지원부서는 연결 없음). */
 export function buildSeedGoals(): GoalSetting[] {
   const goals: Omit<GoalSetting, "order">[] = [
     {
@@ -123,54 +123,39 @@ export function buildSeedGoals(): GoalSetting[] {
       note: "전사 마일스톤: Q1 6억 · Q2 5.7억 (실적) · Q3 4억 · Q4 5억",
     },
     {
-      id: "division:CEO본부", level: "division", name: "글로벌 매출 (해외팀 + 인케어)", division: "CEO본부", team: null, parentId: "company:revenue",
-      unit: "currency", source: "connectable", sourceNote: "국내 해외사업부 + 일본 인케어(9.4원/엔)",
-      targets: {}, annualTarget: null, h1Actual: null, note: "H1 연간목표 글로벌 25억 + 인케어 30억 — H2 배분 확정 필요",
-    },
-    {
-      id: "division:COO본부", level: "division", name: "브랜드 공헌이익 · 운영 효율", division: "COO본부", team: null, parentId: "company:op",
-      unit: "currency", source: "connectable", sourceNote: "Tableau SKU 공헌이익",
-      targets: {}, annualTarget: null, h1Actual: null, note: "H2 브랜드만 이익목표 유지(H1 매출 110억 · OP 9억). 경영지원·CS는 운영 지표 — 본부 KPI 정의 확인 필요",
-    },
-    {
-      id: "division:CPO본부", level: "division", name: "제품(PB) 공헌이익", division: "CPO본부", team: null, parentId: "company:op",
-      unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리별 공헌이익",
-      targets: {}, annualTarget: null, h1Actual: null, note: "H2 재설계상 CPO본부는 브랜드사업부 소속 — 본부 KPI 정의 확인 필요",
-    },
-    {
-      id: teamGoalId("전략기획팀"), level: "team", name: "데이터 정합성 · KPI 정렬도", division: "CEO본부", team: "전략기획팀", parentId: "division:CEO본부",
+      id: teamGoalId("전략기획팀"), level: "team", name: "데이터 정합성 · KPI 정렬도", division: "CEO본부", team: "전략기획팀", parentId: null,
       unit: "percent", source: "manual", sourceNote: "", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
     },
     {
-      id: teamGoalId("해외팀"), level: "team", name: "해외 순매출", division: "CEO본부", team: "해외팀", parentId: "division:CEO본부",
+      id: teamGoalId("해외팀"), level: "team", name: "해외 순매출", division: "CEO본부", team: "해외팀", parentId: "company:revenue",
       unit: "currency", source: "connectable", sourceNote: "국내 시트 해외사업부 컬럼", targets: {}, note: "H1 연간목표 25억 — H2 확정 필요",
     },
     {
-      id: teamGoalId("경영지원팀"), level: "team", name: "고정비 효율화 · 손익 마감 준수", division: "COO본부", team: "경영지원팀", parentId: "division:COO본부",
+      id: teamGoalId("경영지원팀"), level: "team", name: "고정비 효율화 · 손익 마감 준수", division: "COO본부", team: "경영지원팀", parentId: null,
       unit: "percent", source: "manual", sourceNote: "", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
     },
     {
-      id: teamGoalId("브랜드팀"), level: "team", name: "PB 공헌이익", division: "COO본부", team: "브랜드팀", parentId: "division:COO본부",
+      id: teamGoalId("브랜드팀"), level: "team", name: "PB 공헌이익", division: "COO본부", team: "브랜드팀", parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau 채널·SKU 공헌이익", targets: {}, note: "H2 유일한 이익목표 — 목표값 확정 필요",
     },
     {
-      id: teamGoalId("CS팀"), level: "team", name: "1차 상담 종결율 · 고객만족도", division: "COO본부", team: "CS팀", parentId: "division:COO본부",
+      id: teamGoalId("CS팀"), level: "team", name: "1차 상담 종결율 · 고객만족도", division: "COO본부", team: "CS팀", parentId: null,
       unit: "percent", source: "connectable", sourceNote: "채널톡", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
     },
     {
-      id: teamGoalId("상품기획팀"), level: "team", name: "식/용품 카테고리 공헌이익", division: "CPO본부", team: "상품기획팀", parentId: "division:CPO본부",
+      id: teamGoalId("상품기획팀"), level: "team", name: "식/용품 카테고리 공헌이익", division: "CPO본부", team: "상품기획팀", parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
     },
     {
-      id: teamGoalId("디자인팀"), level: "team", name: "장난감 카테고리 공헌이익", division: "CPO본부", team: "디자인팀", parentId: "division:CPO본부",
+      id: teamGoalId("디자인팀"), level: "team", name: "장난감 카테고리 공헌이익", division: "CPO본부", team: "디자인팀", parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
     },
     {
-      id: teamGoalId("패션팀"), level: "team", name: "패션 카테고리 공헌이익", division: "CPO본부", team: "패션팀", parentId: "division:CPO본부",
+      id: teamGoalId("패션팀"), level: "team", name: "패션 카테고리 공헌이익", division: "CPO본부", team: "패션팀", parentId: "company:op",
       unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
     },
     {
-      id: teamGoalId("개발팀"), level: "team", name: "프로젝트 종결 · 기능 구현", division: "CPO본부", team: "개발팀", parentId: "division:CPO본부",
+      id: teamGoalId("개발팀"), level: "team", name: "프로젝트 종결 · 기능 구현", division: "CPO본부", team: "개발팀", parentId: null,
       unit: "count", source: "action", sourceNote: "완료 액션 건수", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
     },
   ];

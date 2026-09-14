@@ -34,7 +34,7 @@ const SOURCE_DESC: Record<MetricSource, string> = {
 
 type Tab = "top" | "team" | "person";
 const TABS: { key: Tab; label: string }[] = [
-  { key: "top", label: "전사 · 본부 목표" },
+  { key: "top", label: "전사 목표" },
   { key: "team", label: "팀 KPI" },
   { key: "person", label: "개인 지표" },
 ];
@@ -46,7 +46,7 @@ const selectCls = `${selectBase} border-border bg-white text-text-primary`;
 const pillCls = (on: boolean) =>
   `px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${on ? "bg-white text-accent shadow-sm" : "text-text-secondary hover:text-text-primary"}`;
 
-/** 금액 입력 단위 — 전사·본부·팀 목표는 억, 개인 지표는 만원 */
+/** 금액 입력 단위 — 전사·팀 목표는 억, 개인 지표는 만원 */
 type Scale = "eok" | "man";
 const SCALE: Record<Scale, { factor: number; suffix: string }> = {
   eok: { factor: 100000000, suffix: "억" },
@@ -149,7 +149,7 @@ function useInlineText(initial: string) {
   return [text, setText] as const;
 }
 
-// ─── 전사 · 본부 목표 (연간 + 분기 말 누적) ─────────────────
+// ─── 전사 목표 (연간 + 분기 말 누적) ────────────────────────
 
 /** 분기 말 누적 마일스톤 = 상반기 실적 + 해당 분기까지의 분기 목표 합. 실적도 이 누적값과 비교한다 */
 function computeMilestones(goal: GoalSetting): Record<Period, number | null> {
@@ -185,7 +185,7 @@ function AnnualGoalCard({
     <div className="rounded-lg border border-border bg-white px-4 py-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded shrink-0">
-          <Target size={9} /> {goal.level === "company" ? "전사" : goal.division}
+          <Target size={9} /> 전사
         </span>
         <input
           value={name}
@@ -467,7 +467,7 @@ export default function MetricSettings() {
           <>
             <p className="text-sm text-text-secondary">등록된 지표 · 목표가 없습니다</p>
             <p className="text-xs text-text-secondary/60 mt-1 mb-4">
-              H2 KPI 재설계 기준 전사·본부·팀 목표와 주간보고록 기반 지표 {PEOPLE.flatMap((p) => p.metrics).length}개를 등록합니다
+              H2 KPI 재설계 기준 전사·팀 목표와 주간보고록 기반 지표 {PEOPLE.flatMap((p) => p.metrics).length}개를 등록합니다
             </p>
             <button
               onClick={seed}
@@ -484,10 +484,9 @@ export default function MetricSettings() {
   }
 
   const companyGoals = goals.filter((g) => g.level === "company");
-  const divisionGoals = goals.filter((g) => g.level === "division");
+  // 본부 목표(level "division")는 사용하지 않음 — 기존 문서는 DB에 남아 있으나 화면에서 제외
   const teamGoals = goals.filter((g) => g.level === "team");
-  const divisionGoal = divisionGoals.find((g) => g.division === division);
-  const needsAnnualFill = [...companyGoals, ...divisionGoals].some((g) => !("annualTarget" in g));
+  const needsAnnualFill = companyGoals.some((g) => !("annualTarget" in g));
   const linkedCount = (goalId: string) =>
     metrics.filter((m) => (m.parentGoalId ?? teamGoalId(m.team)) === goalId).length;
 
@@ -547,7 +546,7 @@ export default function MetricSettings() {
       {tab === "top" && (
         <div className="space-y-5">
           <p className="text-xs text-text-secondary">
-            전사·본부는 연간 목표 기준입니다. 분기 목표는 <b>그 분기 금액</b>으로 넣으면 <b>분기 말 마일스톤</b>(상반기 실적 + 분기 목표 누적)이 자동 계산되고, 실적은 이 누적값과 비교합니다. 금액 단위: 억
+            전사는 연간 목표 기준입니다. 분기 목표는 <b>그 분기 금액</b>으로 넣으면 <b>분기 말 마일스톤</b>(상반기 실적 + 분기 목표 누적)이 자동 계산되고, 실적은 이 누적값과 비교합니다. 금액 단위: 억
           </p>
           {needsAnnualFill && (
             <div className="flex items-center justify-between gap-3 p-3 bg-accent/5 border border-accent/30 rounded-lg flex-wrap">
@@ -573,29 +572,20 @@ export default function MetricSettings() {
               <AnnualGoalCard key={g.id} goal={g} saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
             ))}
           </section>
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Users size={14} className="text-accent" />
-              <h3 className="text-sm font-bold text-text-primary">{GOAL_LEVEL_LABEL.division} 목표</h3>
-            </div>
-            {divisionGoals.map((g) => (
-              <AnnualGoalCard key={g.id} goal={g} saveState={saveStates[g.id]} onSave={(p) => saveGoal(g.id, p)} />
-            ))}
-          </section>
         </div>
       )}
 
       {tab === "team" && (
         <div className="space-y-3">
-          {divisionGoal && (
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-surface border border-border text-xs text-text-secondary flex-wrap">
-              <span className="font-semibold text-text-primary">{division} · {divisionGoal.name}</span>
-              <span>{PERIOD_LABEL[period]} 목표 {formatEok(divisionGoal.targets?.[period], divisionGoal.unit)}</span>
-              <span>{period.slice(-2)} 말 마일스톤 <b className="text-accent">{formatEok(computeMilestones(divisionGoal)[period], divisionGoal.unit)}</b></span>
-              <span>연간 {formatEok(divisionGoal.annualTarget, divisionGoal.unit)}</span>
-              <button onClick={() => setTab("top")} className="ml-auto text-accent hover:underline">본부 목표 수정</button>
+          {companyGoals.map((g) => (
+            <div key={g.id} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-surface border border-border text-xs text-text-secondary flex-wrap">
+              <span className="font-semibold text-text-primary">{g.name}</span>
+              <span>{PERIOD_LABEL[period]} 목표 {formatEok(g.targets?.[period], g.unit)}</span>
+              <span>{period.slice(-2)} 말 마일스톤 <b className="text-accent">{formatEok(computeMilestones(g)[period], g.unit)}</b></span>
+              <span>연간 {formatEok(g.annualTarget, g.unit)}</span>
+              <button onClick={() => setTab("top")} className="ml-auto text-accent hover:underline">전사 목표 수정</button>
             </div>
-          )}
+          ))}
           {divTeams.map((t) => {
             const g = teamGoals.find((x) => x.team === t);
             if (!g) return null;
