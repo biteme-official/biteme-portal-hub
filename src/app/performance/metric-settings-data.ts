@@ -24,6 +24,18 @@ export const CADENCE_LABEL: Record<MetricCadence, string> = {
   quarterly: "분기",
 };
 
+export const GOALS_COLLECTION = "performance_goals";
+
+export const PERIODS = ["2026Q3", "2026Q4"] as const;
+export type Period = (typeof PERIODS)[number];
+export const PERIOD_LABEL: Record<Period, string> = { "2026Q3": "26년 3Q", "2026Q4": "26년 4Q" };
+
+/** 분기별 목표값. null = 미확정 */
+export type Targets = Partial<Record<Period, number | null>>;
+
+export type GoalLevel = "company" | "division" | "team";
+export const GOAL_LEVEL_LABEL: Record<GoalLevel, string> = { company: "전사", division: "본부", team: "팀" };
+
 export interface MetricSetting {
   id: string;
   name: string;
@@ -38,9 +50,119 @@ export interface MetricSetting {
   team: string;
   scopes: string[];
   baseline: number | null;
+  /** 연결된 상위 목표(팀 KPI) — 없으면 담당 팀 기본 KPI */
+  parentGoalId?: string | null;
+  targets?: Targets;
   order: number;
   updatedAt?: string | null;
   updatedBy?: string | null;
+}
+
+export interface GoalSetting {
+  id: string;
+  level: GoalLevel;
+  name: string;
+  division: string | null;
+  team: string | null;
+  parentId: string | null;
+  unit: MetricUnit;
+  source: MetricSource;
+  sourceNote: string;
+  targets: Targets;
+  /** 근거·확정 필요 사항 */
+  note: string;
+  order: number;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/** 요청 body의 targets를 검증해 { period: number|null } 로 정리. 잘못된 값이면 null 반환 */
+export function parseTargets(raw: unknown): Targets | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Targets = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!PERIODS.includes(k as Period)) return null;
+    if (v === null || v === "") out[k as Period] = null;
+    else if (typeof v === "number" && Number.isFinite(v)) out[k as Period] = v;
+    else return null;
+  }
+  return out;
+}
+
+export function teamGoalId(team: string): string {
+  return `team:${team}`;
+}
+
+const EOK = 100000000;
+
+/** H2 KPI 재설계(2026-08-13) 기준 초기 목표. 사업부별 배분이 미확정이라 본부·팀 목표값은 비워 둔다. */
+export function buildSeedGoals(): GoalSetting[] {
+  const goals: Omit<GoalSetting, "order">[] = [
+    {
+      id: "company:revenue", level: "company", name: "전사 매출", division: null, team: null, parentId: null,
+      unit: "currency", source: "connectable", sourceNote: "국내 2026 SUMMARY 시트 + 인케어 매출 시트 (KPI 시트 동기화 로직 재사용)",
+      targets: { "2026Q3": 52.8 * EOK, "2026Q4": 61.2 * EOK },
+      note: "연간 200억 · H1 실적 86억 · H2 필요 114억 (월 배분 7~12월 15.8/17.4/19.6/19.1/20.3/21.8억)",
+    },
+    {
+      id: "company:op", level: "company", name: "전사 영업이익", division: null, team: null, parentId: null,
+      unit: "currency", source: "connectable", sourceNote: "국내 공헌이익 − 고정비 일할(월 2.2억)",
+      targets: { "2026Q3": null, "2026Q4": null },
+      note: "연간 20억 · H1 실적 11억 · H2 필요 9억 — 분기 배분 미정",
+    },
+    {
+      id: "division:CEO본부", level: "division", name: "글로벌 매출 (해외팀 + 인케어)", division: "CEO본부", team: null, parentId: "company:revenue",
+      unit: "currency", source: "connectable", sourceNote: "국내 해외사업부 + 일본 인케어(9.4원/엔)",
+      targets: {}, note: "H1 연간목표 글로벌 25억 + 인케어 30억 — H2 배분 확정 필요",
+    },
+    {
+      id: "division:COO본부", level: "division", name: "브랜드 공헌이익 · 운영 효율", division: "COO본부", team: null, parentId: "company:op",
+      unit: "currency", source: "connectable", sourceNote: "Tableau SKU 공헌이익",
+      targets: {}, note: "H2 브랜드만 이익목표 유지(H1 매출 110억 · OP 9억). 경영지원·CS는 운영 지표 — 본부 KPI 정의 확인 필요",
+    },
+    {
+      id: "division:CPO본부", level: "division", name: "제품(PB) 공헌이익", division: "CPO본부", team: null, parentId: "company:op",
+      unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리별 공헌이익",
+      targets: {}, note: "H2 재설계상 CPO본부는 브랜드사업부 소속 — 본부 KPI 정의 확인 필요",
+    },
+    {
+      id: teamGoalId("전략기획팀"), level: "team", name: "데이터 정합성 · KPI 정렬도", division: "CEO본부", team: "전략기획팀", parentId: "division:CEO본부",
+      unit: "percent", source: "manual", sourceNote: "", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
+    },
+    {
+      id: teamGoalId("해외팀"), level: "team", name: "해외 순매출", division: "CEO본부", team: "해외팀", parentId: "division:CEO본부",
+      unit: "currency", source: "connectable", sourceNote: "국내 시트 해외사업부 컬럼", targets: {}, note: "H1 연간목표 25억 — H2 확정 필요",
+    },
+    {
+      id: teamGoalId("경영지원팀"), level: "team", name: "고정비 효율화 · 손익 마감 준수", division: "COO본부", team: "경영지원팀", parentId: "division:COO본부",
+      unit: "percent", source: "manual", sourceNote: "", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
+    },
+    {
+      id: teamGoalId("브랜드팀"), level: "team", name: "PB 공헌이익", division: "COO본부", team: "브랜드팀", parentId: "division:COO본부",
+      unit: "currency", source: "connectable", sourceNote: "Tableau 채널·SKU 공헌이익", targets: {}, note: "H2 유일한 이익목표 — 목표값 확정 필요",
+    },
+    {
+      id: teamGoalId("CS팀"), level: "team", name: "1차 상담 종결율 · 고객만족도", division: "COO본부", team: "CS팀", parentId: "division:COO본부",
+      unit: "percent", source: "connectable", sourceNote: "채널톡", targets: {}, note: "H2 지원부서 KPI 후보안 — 확정 필요",
+    },
+    {
+      id: teamGoalId("상품기획팀"), level: "team", name: "식/용품 카테고리 공헌이익", division: "CPO본부", team: "상품기획팀", parentId: "division:CPO본부",
+      unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
+    },
+    {
+      id: teamGoalId("디자인팀"), level: "team", name: "장난감 카테고리 공헌이익", division: "CPO본부", team: "디자인팀", parentId: "division:CPO본부",
+      unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
+    },
+    {
+      id: teamGoalId("패션팀"), level: "team", name: "패션 카테고리 공헌이익", division: "CPO본부", team: "패션팀", parentId: "division:CPO본부",
+      unit: "currency", source: "connectable", sourceNote: "Tableau 카테고리 공헌이익", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
+    },
+    {
+      id: teamGoalId("개발팀"), level: "team", name: "프로젝트 종결 · 기능 구현", division: "CPO본부", team: "개발팀", parentId: "division:CPO본부",
+      unit: "count", source: "action", sourceNote: "완료 액션 건수", targets: {}, note: "구성원 Key Metric에서 추론 — 확정 필요",
+    },
+  ];
+  return goals.map((g, order) => ({ ...g, order }));
 }
 
 const CADENCE_BY_KIND: Record<MetricKind, MetricCadence> = {
@@ -123,6 +245,8 @@ export function buildSeedMetrics(): MetricSetting[] {
         team: p.team,
         scopes: m.scopes ?? [],
         baseline: m.baseline,
+        parentGoalId: teamGoalId(p.team),
+        targets: {},
         order: order++,
       };
     })
