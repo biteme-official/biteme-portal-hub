@@ -48,8 +48,18 @@ export default function PendingApprovalBadge() {
       }
     });
 
-    const interval = setInterval(fetchPending, 60_000);
-    return () => clearInterval(interval);
+    // 탭이 안 보일 때는 폴링하지 않음 (Firestore 읽기 한도 절약)
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchPending();
+    }, 180_000);
+    const onVisible = () => {
+      if (!document.hidden) fetchPending();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [loading, user, fetchPending]);
 
   function dismissToast() {

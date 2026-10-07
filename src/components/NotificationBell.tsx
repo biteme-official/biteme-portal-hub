@@ -52,8 +52,18 @@ export default function NotificationBell() {
   useEffect(() => {
     if (loading || !user) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30_000);
-    return () => clearInterval(interval);
+    // 탭이 안 보일 때는 폴링하지 않음 (Firestore 읽기 한도 절약)
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchNotifications();
+    }, 120_000);
+    const onVisible = () => {
+      if (!document.hidden) fetchNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [loading, user, fetchNotifications]);
 
   useEffect(() => {
