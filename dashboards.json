@@ -67,6 +67,18 @@
       }
     },
     {
+      "slug": "cpo-dashboard",
+      "name": "CPO 대시보드",
+      "description": "CPO 본부 상품 기획·SKU·디자인·촬영 일정 관리",
+      "category": "product",
+      "path": "https://cpo-dashboard-alpha.vercel.app",
+      "type": "external",
+      "status": "active",
+      "owner": "CPO 본부",
+      "tags": ["CPO", "상품기획", "SKU", "디자인"],
+      "github": "https://github.com/biteme-official/cpo-dashboard"
+    },
+    {
       "slug": "roi-dashboard",
       "name": "전사 ROI 대시보드",
       "description": "바잇미 전사 ROI 대시보드 (Tableau MCP 연동)",
