@@ -1,5 +1,5 @@
 import { getActiveDashboards, getCategories } from "@/lib/dashboards";
-import DashboardCard from "@/components/DashboardCard";
+import HomeGroups from "@/components/HomeGroups";
 import { LayoutDashboard } from "lucide-react";
 
 export default function Home() {
@@ -49,27 +49,5 @@ export default function Home() {
     }))
     .filter((g) => g.items.length > 0);
 
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-text-primary">대시보드</h1>
-        <p className="text-sm text-text-secondary mt-1">
-          전사 업무 툴 & 대시보드 ({dashboards.length}개)
-        </p>
-      </div>
-
-      {grouped.map((group) => (
-        <section key={group.id} className="mb-8">
-          <h2 className="text-sm font-semibold text-text-secondary mb-3 uppercase tracking-wider">
-            {group.label}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {group.items.map((d) => (
-              <DashboardCard key={d.slug} dashboard={d} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
+  return <HomeGroups groups={grouped} />;
 }

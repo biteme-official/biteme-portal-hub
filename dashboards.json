@@ -1,5 +1,6 @@
 {
   "categories": [
+    { "id": "erp", "label": "업무 시스템", "icon": "Building2", "order": 0 },
     { "id": "d2c", "label": "실시간 채널 대시보드", "icon": "ShoppingBag", "order": 1 },
     { "id": "product", "label": "프로덕트", "icon": "Package", "order": 2 },
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
@@ -131,7 +132,7 @@
       "slug": "biteme-erp",
       "name": "바잇미 ERP",
       "description": "발주·입고·매입 확정·지급 ERP (1단계 목업)",
-      "category": "etc",
+      "category": "erp",
       "path": "https://erp.165-232-168-201.sslip.io/auth/hub",
       "type": "external",
       "status": "active",
@@ -139,7 +140,8 @@
       "tags": ["ERP", "발주", "지급"],
       "github": "https://github.com/biteme-official/biteme-erp",
       "roles": ["master", "buyer", "finance", "viewer"],
-      "roleLabels": { "master": "마스터", "buyer": "구매", "finance": "재무", "viewer": "조회" }
+      "roleLabels": { "master": "마스터", "buyer": "구매", "finance": "재무", "viewer": "조회" },
+      "visiblePositions": []
     }
   ]
 }

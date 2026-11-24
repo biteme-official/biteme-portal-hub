@@ -23,6 +23,7 @@ import {
 import {
   getCategories,
   getDashboardsByCategory,
+  isVisibleTo,
   getArchivedDashboards,
 } from "@/lib/dashboards";
 import { useAuth } from "@/contexts/AuthContext";
@@ -139,11 +140,7 @@ export default function Sidebar() {
         {categories.map((cat) => {
           const Icon = iconMap[cat.icon] || MoreHorizontal;
           const dashboards = getDashboardsByCategory(cat.id).filter(
-            (d) =>
-              d.status === "active" &&
-              (!d.visiblePositions ||
-                user?.role === "admin" ||
-                (user?.position && d.visiblePositions.includes(user.position)))
+            (d) => d.status === "active" && isVisibleTo(d, user)
           );
 
           return (
