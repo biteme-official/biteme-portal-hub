@@ -1,5 +1,5 @@
-import { getAdminDb } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/auth/session";
+import { kms } from "@/lib/kms/client";
 
 export async function GET() {
   const session = await getSession();
@@ -7,22 +7,9 @@ export async function GET() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const doc = await db.collection("delegations").doc(session.uid).get();
-
-  if (!doc.exists) {
-    return Response.json({ delegation: null });
-  }
-
-  const d = doc.data()!;
-  const now = new Date();
-  const endDate = d.endDate ? new Date(d.endDate) : null;
-
-  if (endDate && endDate < now) {
-    return Response.json({ delegation: null });
-  }
-
-  return Response.json({ delegation: d });
+  // 끝난 위임은 KMS 가 null 로 돌려준다
+  const res = await kms<{ delegation: unknown }>("/delegation", { actorUid: session.uid });
+  return Response.json({ delegation: res.delegation });
 }
 
 export async function PUT(request: Request) {
@@ -40,16 +27,22 @@ export async function PUT(request: Request) {
     return Response.json({ error: "본인에게 위임할 수 없습니다." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  await db.collection("delegations").doc(session.uid).set({
-    ownerUid: session.uid,
-    ownerName: session.name,
-    delegateTo,
-    startDate: startDate || new Date().toISOString().split("T")[0],
-    endDate: endDate || null,
-    reason: reason || "",
-    isActive: true,
-  });
+  try {
+    await kms("/delegation", {
+      method: "PUT",
+      actorUid: session.uid,
+      body: {
+        ownerName: session.name,
+        delegateTo,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        reason: reason || "",
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "저장 실패";
+    return Response.json({ error: message }, { status: 400 });
+  }
 
   return Response.json({ success: true });
 }
@@ -60,8 +53,7 @@ export async function DELETE() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  await db.collection("delegations").doc(session.uid).delete();
+  await kms("/delegation", { method: "DELETE", actorUid: session.uid });
 
   return Response.json({ success: true });
 }

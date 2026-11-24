@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+import { listApprovals } from "@/lib/firestore/approvals";
 import { sendSlackReminders } from "@/lib/notifications/slack";
 import { dispatchNotification } from "@/lib/notifications/send";
 
@@ -11,11 +11,8 @@ export async function POST(request: Request) {
     }
   }
 
-  const db = getAdminDb();
-  const snapshot = await db
-    .collection("approvals")
-    .orderBy("createdAt", "desc")
-    .get();
+  // 진행 중인 결재만 KMS 에서 가져온다
+  const approvals = await listApprovals({ status: ["pending", "in_progress"] });
 
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -29,25 +26,20 @@ export async function POST(request: Request) {
     currentApproverEmail: string;
   }[] = [];
 
-  for (const doc of snapshot.docs) {
-    const d = doc.data();
-    if (d.status !== "pending" && d.status !== "in_progress") continue;
-
-    const submittedAt =
-      d.submittedAt?.toDate?.()?.getTime() ||
-      d.createdAt?.toDate?.()?.getTime();
+  for (const d of approvals) {
+    const submittedAt = Date.parse(d.submittedAt || d.createdAt || "");
     if (!submittedAt) continue;
 
     const daysSince = Math.floor((now - submittedAt) / ONE_DAY);
     if (daysSince < 1) continue;
 
     const currentStep = (d.approvalLine || []).find(
-      (s: { status: string }) => s.status === "current"
+      (s) => s.status === "current"
     );
     if (!currentStep) continue;
 
     delayed.push({
-      id: doc.id,
+      id: d.id,
       title: d.title,
       requesterName: d.requester?.name || "",
       daysSince,
