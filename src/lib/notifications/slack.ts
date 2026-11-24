@@ -1,5 +1,5 @@
 import "server-only";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { findUserByEmail, updateUser } from "@/lib/kms/users";
 import type { NotificationType } from "@/lib/types/notification";
 
 const BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
@@ -61,18 +61,10 @@ const slackIdCache = new Map<string, string | null>();
 async function getSlackUserId(email: string): Promise<string | null> {
   if (slackIdCache.has(email)) return slackIdCache.get(email)!;
 
-  const db = getAdminDb();
-  const snap = await db
-    .collection("users")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
-  if (!snap.empty) {
-    const slackId = snap.docs[0].data().slackUserId;
-    if (slackId) {
-      slackIdCache.set(email, slackId);
-      return slackId;
-    }
+  const user = await findUserByEmail(email).catch(() => null);
+  if (user?.slackUserId) {
+    slackIdCache.set(email, user.slackUserId);
+    return user.slackUserId;
   }
 
   const result = await slackApi("users.lookupByEmail", { email });
@@ -80,8 +72,8 @@ async function getSlackUserId(email: string): Promise<string | null> {
 
   if (slackId) {
     slackIdCache.set(email, slackId);
-    if (!snap.empty) {
-      snap.docs[0].ref.update({ slackUserId: slackId }).catch(() => {});
+    if (user) {
+      updateUser(user.uid, { slackUserId: slackId }).catch(() => {});
     }
   }
 

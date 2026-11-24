@@ -1,6 +1,6 @@
-import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
+import { getAdminAuth } from "@/lib/firebase/admin";
 import { createSessionToken } from "@/lib/auth/session";
-import { FieldValue } from "firebase-admin/firestore";
+import { createUser, findUserByEmail, getUser, listUsers, moveUser, touchLogin } from "@/lib/kms/users";
 import { NextResponse } from "next/server";
 import { notifyNewUserRegistered } from "@/lib/notifications/send";
 
@@ -67,7 +67,6 @@ export async function POST(request: Request) {
       : undefined;
 
     const adminAuth = getAdminAuth();
-    const adminDb = getAdminDb();
 
     let decoded: { uid: string; email?: string; name?: string; picture?: string };
     let isCredentialLogin = false;
@@ -90,11 +89,8 @@ export async function POST(request: Request) {
       decoded = { uid: result.uid, email: result.email };
       isCredentialLogin = true;
 
-      const userDoc = await adminDb
-        .collection("users")
-        .doc(decoded.uid)
-        .get();
-      if (!userDoc.exists || userDoc.data()?.authType !== "credential") {
+      const credentialUser = await getUser(decoded.uid);
+      if (!credentialUser || credentialUser.authType !== "credential") {
         return Response.json(
           { error: "예외 로그인 계정이 아닙니다. 구글 로그인을 이용하세요." },
           { status: 403 }
@@ -102,33 +98,19 @@ export async function POST(request: Request) {
       }
     }
 
-    let userRef = adminDb.collection("users").doc(decoded.uid);
-    let userDoc = await userRef.get();
+    // 직원 정보·권한은 KMS (Firebase 는 로그인 확인만)
+    let userData = await getUser(decoded.uid);
 
-    if (!userDoc.exists) {
-      const byEmail = await adminDb
-        .collection("users")
-        .where("email", "==", decoded.email)
-        .limit(1)
-        .get();
+    if (!userData) {
+      const byEmail = await findUserByEmail(decoded.email!);
 
-      if (!byEmail.empty) {
-        const oldDoc = byEmail.docs[0];
-        const oldData = oldDoc.data();
-
-        await userRef.set({
-          ...oldData,
-          uid: decoded.uid,
-          photoURL: decoded.picture || oldData.photoURL || null,
-          lastLoginAt: FieldValue.serverTimestamp(),
-        });
-        await oldDoc.ref.delete();
-        userDoc = await userRef.get();
+      if (byEmail) {
+        // 관리자가 미리 등록한 직원의 첫 로그인: 기존 정보를 구글 uid 로 옮김
+        userData = await moveUser(byEmail.uid, decoded.uid, decoded.picture || byEmail.photoURL || null);
       } else {
-        const usersSnapshot = await adminDb.collection("users").limit(1).get();
-        const isFirstUser = usersSnapshot.empty;
+        const isFirstUser = (await listUsers()).length === 0;
         const newUserName = decoded.name || decoded.email!.split("@")[0];
-        await userRef.set({
+        userData = await createUser({
           uid: decoded.uid,
           email: decoded.email!,
           name: newUserName,
@@ -139,16 +121,11 @@ export async function POST(request: Request) {
           role: isFirstUser ? "admin" : "member",
           isActive: isFirstUser,
           dashboardAccess: {},
-          createdAt: FieldValue.serverTimestamp(),
-          lastLoginAt: null,
         });
-        userDoc = await userRef.get();
 
         // Notification is handled in the !isActive block below with proper guards
       }
     }
-
-    const userData = userDoc.data()!;
 
     if (!userData.isActive) {
       const isPending = !userData.lastLoginAt;
@@ -177,7 +154,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await userRef.update({ lastLoginAt: FieldValue.serverTimestamp() });
+    await touchLogin(decoded.uid);
 
     const { token, expiresAt } = await createSessionToken({
       uid: decoded.uid,

@@ -1,5 +1,5 @@
 import { getSession, deleteSession } from "@/lib/auth/session";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser, type PortalUser } from "@/lib/kms/users";
 
 export async function GET() {
   const session = await getSession();
@@ -8,15 +8,27 @@ export async function GET() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const userDoc = await db.collection("users").doc(session.uid).get();
+  let userData: PortalUser | null;
+  try {
+    userData = await getUser(session.uid);
+  } catch (e) {
+    // KMS 가 잠시 응답하지 않으면 로그인 세션 정보로 계속 쓴다 (로그아웃시키지 않음)
+    console.error("auth/me: KMS 조회 실패, 세션 정보 사용", e);
+    return Response.json({
+      uid: session.uid,
+      email: session.email,
+      name: session.name,
+      photoURL: session.photoURL,
+      role: session.role,
+      position: "",
+    });
+  }
 
-  if (!userDoc.exists || !userDoc.data()?.isActive) {
+  if (!userData || !userData.isActive) {
     await deleteSession();
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userData = userDoc.data()!;
   return Response.json({
     uid: session.uid,
     email: session.email,

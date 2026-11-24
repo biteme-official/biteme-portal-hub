@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser, updateUser } from "@/lib/kms/users";
 import { getSession } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
@@ -12,17 +12,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "uid와 archive(boolean)가 필요합니다." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(uid);
-  const userDoc = await userRef.get();
+  const userData = await getUser(uid);
 
-  if (!userDoc.exists) {
+  if (!userData) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  await userRef.update({
+  await updateUser(uid, {
     isArchived: archive,
-    isActive: archive ? false : userDoc.data()!.isActive,
+    isActive: archive ? false : userData.isActive,
   });
 
   return Response.json({ success: true, isArchived: archive });

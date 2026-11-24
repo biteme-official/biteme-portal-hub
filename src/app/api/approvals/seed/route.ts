@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser } from "@/lib/kms/users";
 import { importRecords } from "@/lib/firestore/approvals";
 
 const TEST_APPROVALS = [
@@ -45,12 +45,10 @@ export async function POST() {
   if (!session)
     return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = getAdminDb();
-  const currentUser = await db.collection("users").doc(session.uid).get();
-  if (!currentUser.exists)
+  const cu = await getUser(session.uid);
+  if (!cu)
     return Response.json({ error: "User not found" }, { status: 404 });
 
-  const cu = currentUser.data()!;
   const approverRef = {
     uid: cu.uid,
     name: cu.name,

@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser, updateUser } from "@/lib/kms/users";
 import { getSession } from "@/lib/auth/session";
 import { sendUserApprovedDm } from "@/lib/notifications/slack";
 
@@ -13,20 +13,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "uid가 필요합니다." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(uid);
-  const userDoc = await userRef.get();
+  const userData = await getUser(uid);
 
-  if (!userDoc.exists) {
+  if (!userData) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const userData = userDoc.data()!;
   if (userData.isActive) {
     return Response.json({ error: "이미 활성화된 사용자입니다." }, { status: 400 });
   }
 
-  await userRef.update({ isActive: true });
+  await updateUser(uid, { isActive: true });
 
   await sendUserApprovedDm(userData.email, userData.name).catch((e) =>
     console.error("Approved DM error:", e)

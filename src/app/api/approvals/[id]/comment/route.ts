@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { addComment, getApproval } from "@/lib/firestore/approvals";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser } from "@/lib/kms/users";
 import { notifyComment } from "@/lib/notifications/send";
 
 export async function POST(
@@ -17,9 +17,7 @@ export async function POST(
       return Response.json({ error: "코멘트를 입력해주세요." }, { status: 400 });
     }
 
-    const db = getAdminDb();
-    const userDoc = await db.collection("users").doc(session.uid).get();
-    const userData = userDoc.data();
+    const userData = await getUser(session.uid).catch(() => null);
 
     const author = {
       uid: session.uid,

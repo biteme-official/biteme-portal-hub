@@ -1,6 +1,6 @@
-import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
+import { getAdminAuth } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/auth/session";
-import { FieldValue } from "firebase-admin/firestore";
+import { createUser, findUserByEmail } from "@/lib/kms/users";
 
 const CREDENTIAL_DOMAIN = "@credential.biteme.co.kr";
 
@@ -34,16 +34,9 @@ export async function POST(request: Request) {
   }
 
   const email = loginId.includes("@") ? loginId : `${loginId}${CREDENTIAL_DOMAIN}`;
-  const db = getAdminDb();
   const auth = getAdminAuth();
 
-  const existing = await db
-    .collection("users")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
-
-  if (!existing.empty) {
+  if (await findUserByEmail(email)) {
     return Response.json(
       { error: "이미 등록된 아이디입니다." },
       { status: 409 }
@@ -57,8 +50,8 @@ export async function POST(request: Request) {
       displayName: name || loginId,
     });
 
-    const docRef = db.collection("users").doc(firebaseUser.uid);
-    await docRef.set({
+    // 로그인 계정은 Firebase Auth, 직원 정보는 KMS
+    await createUser({
       uid: firebaseUser.uid,
       email,
       loginId,
@@ -71,8 +64,6 @@ export async function POST(request: Request) {
       isActive: true,
       authType: "credential",
       dashboardAccess: {},
-      createdAt: FieldValue.serverTimestamp(),
-      lastLoginAt: null,
     });
 
     return Response.json({ success: true, uid: firebaseUser.uid });
