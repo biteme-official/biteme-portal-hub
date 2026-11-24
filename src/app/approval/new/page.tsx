@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Send, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +37,47 @@ export default function NewApprovalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileUploadRef = useRef<FileUploadHandle | null>(null);
+  // ?draft=<id> 로 열면 임시저장 문서를 불러와 이어서 수정
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(false);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("draft");
+    if (!id) return;
+    setDraftId(id);
+    setLoadingDraft(true);
+    fetch(`/api/approvals/${encodeURIComponent(id)}`)
+      .then(async (res) => {
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "임시저장 문서를 불러오지 못했습니다.");
+        if (d.status !== "draft") throw new Error("임시저장 상태인 문서만 수정할 수 있습니다.");
+        setTitle(d.title || "");
+        setDescription(d.description || "");
+        setCategory(d.category || "기타");
+        setIsUrgent(!!d.isUrgent);
+        setApprovers((d.approvalLine || []).map((s: { approver: UserRef }) => s.approver));
+        setCcList(d.ccList || []);
+        setAttachments(d.attachments || []);
+        setVoteType(d.voteType || "none");
+        if (d.voteOptions?.length) setVoteOptions(d.voteOptions);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
+      .finally(() => setLoadingDraft(false));
+  }, []);
+
+  /** 새 문서면 만들고, 임시저장 문서면 고친다. 문서 id 를 돌려준다. */
+  async function saveDraft(): Promise<{ id?: string; error?: string }> {
+    const finalAttachments = fileUploadRef.current?.flushPendingLink() ?? attachments;
+    const body = JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments: finalAttachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] });
+    const res = await fetch(draftId ? `/api/approvals/${encodeURIComponent(draftId)}` : "/api/approvals", {
+      method: draftId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: data.error };
+    return { id: draftId ?? data.id };
+  }
 
   async function handleSaveDraft() {
     if (!title.trim()) {
@@ -46,18 +87,12 @@ export default function NewApprovalPage() {
     setSaving(true);
     setError(null);
 
-    const finalAttachments = fileUploadRef.current?.flushPendingLink() ?? attachments;
-    const res = await fetch("/api/approvals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments: finalAttachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
-    });
+    const res = await saveDraft();
 
-    if (res.ok) {
+    if (!res.error) {
       router.push("/approval");
     } else {
-      const data = await res.json();
-      setError(data.error || "저장에 실패했습니다.");
+      setError(res.error || "저장에 실패했습니다.");
     }
     setSaving(false);
   }
@@ -78,21 +113,15 @@ export default function NewApprovalPage() {
     setSubmitting(true);
     setError(null);
 
-    const finalAttachments = fileUploadRef.current?.flushPendingLink() ?? attachments;
-    const createRes = await fetch("/api/approvals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description, category, isUrgent, approvers, ccList, attachments: finalAttachments, voteType, voteOptions: voteType === "options" ? voteOptions : [] }),
-    });
+    const saved = await saveDraft();
 
-    if (!createRes.ok) {
-      const data = await createRes.json();
-      setError(data.error || "생성에 실패했습니다.");
+    if (saved.error || !saved.id) {
+      setError(saved.error || "생성에 실패했습니다.");
       setSubmitting(false);
       return;
     }
 
-    const { id } = await createRes.json();
+    const id = saved.id;
 
     const submitRes = await fetch(`/api/approvals/${id}/submit`, {
       method: "POST",
@@ -116,7 +145,8 @@ export default function NewApprovalPage() {
         >
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-xl font-bold text-text-primary">새 결재 요청</h1>
+        <h1 className="text-xl font-bold text-text-primary">{draftId ? "임시저장 결재 수정" : "새 결재 요청"}</h1>
+        {loadingDraft && <Loader2 size={16} className="animate-spin text-text-secondary" />}
       </div>
 
       <div className="bg-white rounded-xl border border-border p-6 space-y-5">
@@ -328,7 +358,7 @@ export default function NewApprovalPage() {
         <div className="flex gap-2 pt-2">
           <button
             onClick={handleSaveDraft}
-            disabled={saving || submitting}
+            disabled={saving || submitting || loadingDraft}
             className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm text-text-secondary hover:bg-surface transition-colors disabled:opacity-50"
           >
             {saving ? (
@@ -340,7 +370,7 @@ export default function NewApprovalPage() {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || submitting}
+            disabled={saving || submitting || loadingDraft}
             className="flex items-center gap-2 px-6 py-2.5 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
           >
             {submitting ? (
