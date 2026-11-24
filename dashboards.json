@@ -126,6 +126,20 @@
       "owner": "전략기획팀",
       "tags": ["글로벌", "일본", "인케어"],
       "github": "https://github.com/biteme-official/japan-mall-retro"
+    },
+    {
+      "slug": "biteme-erp",
+      "name": "바잇미 ERP",
+      "description": "발주·입고·매입 확정·지급 ERP (1단계 목업)",
+      "category": "etc",
+      "path": "https://erp.165-232-168-201.sslip.io/auth/hub",
+      "type": "external",
+      "status": "active",
+      "owner": "전략기획팀",
+      "tags": ["ERP", "발주", "지급"],
+      "github": "https://github.com/biteme-official/biteme-erp",
+      "roles": ["master", "buyer", "finance", "viewer"],
+      "roleLabels": { "master": "마스터", "buyer": "구매", "finance": "재무", "viewer": "조회" }
     }
   ]
 }
