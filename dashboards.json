@@ -6,8 +6,7 @@
     { "id": "revenue", "label": "수익/재무", "icon": "TrendingUp", "order": 3 },
     { "id": "sku-pricing", "label": "SKU/프라이싱", "icon": "Tag", "order": 4 },
     { "id": "strategy", "label": "전략/계획", "icon": "Target", "order": 5 },
-    { "id": "global", "label": "글로벌", "icon": "Globe", "order": 6 },
-    { "id": "etc", "label": "기타", "icon": "MoreHorizontal", "order": 7 }
+    { "id": "global", "label": "글로벌", "icon": "Globe", "order": 6 }
   ],
   "dashboards": [
     {
