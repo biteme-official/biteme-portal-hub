@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser } from "@/lib/kms/users";
 import { getDashboardBySlug } from "@/lib/dashboards";
 import { SignJWT } from "jose";
 
@@ -18,9 +18,11 @@ export async function POST(request: Request) {
   const dashboard = getDashboardBySlug(slug);
   const hasRoles = dashboard?.roles && dashboard.roles.length > 0;
 
-  const db = getAdminDb();
-  const userDoc = await db.collection("users").doc(session.uid).get();
-  const userData = userDoc.data();
+  // KMS 가 잠시 응답하지 않으면 세션의 관리자 여부만으로 판단 (권한 제한 없는 대시보드는 그대로 열림)
+  const userData = await getUser(session.uid).catch((e) => {
+    console.error("iframe-token: KMS 조회 실패, 세션 정보 사용", e);
+    return { role: session.role, dashboardAccess: {} as Record<string, string> };
+  });
   const access: Record<string, string> = userData?.dashboardAccess || {};
 
   const ROLE_MIGRATION: Record<string, string> = { marketing: "viewer", cs: "viewer" };

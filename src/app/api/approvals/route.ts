@@ -1,13 +1,11 @@
 import { getSession } from "@/lib/auth/session";
 import { createApproval, listApprovals, deleteAllApprovals, deleteApprovalAsAdmin } from "@/lib/firestore/approvals";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser } from "@/lib/kms/users";
 import type { ApprovalStatus } from "@/lib/types/approval";
 
 async function getRequester(uid: string) {
-  const db = getAdminDb();
-  const doc = await db.collection("users").doc(uid).get();
-  if (!doc.exists) return null;
-  const d = doc.data()!;
+  const d = await getUser(uid);
+  if (!d) return null;
   return {
     uid: d.uid,
     name: d.name,

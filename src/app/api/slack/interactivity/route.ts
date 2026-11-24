@@ -1,4 +1,4 @@
-import { getAdminDb } from "@/lib/firebase/admin";
+import { getUser, updateUser } from "@/lib/kms/users";
 import { slackApi, sendUserApprovedDm } from "@/lib/notifications/slack";
 import crypto from "crypto";
 
@@ -73,15 +73,11 @@ export async function POST(request: Request) {
 
     if (action?.action_id === "approve_user") {
       const targetUid = action.value;
-      const db = getAdminDb();
-      const userRef = db.collection("users").doc(targetUid);
-      const userDoc = await userRef.get();
+      const userData = await getUser(targetUid);
 
-      if (!userDoc.exists) {
+      if (!userData) {
         return Response.json({ text: "사용자를 찾을 수 없습니다." });
       }
-
-      const userData = userDoc.data()!;
 
       if (userData.isActive) {
         await slackApi("chat.update", {
@@ -200,28 +196,22 @@ export async function POST(request: Request) {
       const slackUserId =
         values.slack_id_block?.slack_id?.value?.trim() || null;
 
-      const db = getAdminDb();
-      const userRef = db.collection("users").doc(meta.targetUid);
-      const userDoc = await userRef.get();
+      const userData = await getUser(meta.targetUid);
 
-      if (!userDoc.exists) {
+      if (!userData) {
         return Response.json({
           response_action: "errors",
           errors: { division_block: "사용자를 찾을 수 없습니다." },
         });
       }
 
-      const userData = userDoc.data()!;
-
-      const updateData: Record<string, unknown> = {
+      await updateUser(meta.targetUid, {
         isActive: true,
         division,
         department: team,
         position,
-      };
-      if (slackUserId) updateData.slackUserId = slackUserId;
-
-      await userRef.update(updateData);
+        ...(slackUserId ? { slackUserId } : {}),
+      });
 
       const approverName =
         payload.user?.name || payload.user?.username || "관리자";

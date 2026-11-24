@@ -1,6 +1,6 @@
-import { getAdminDb } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/auth/session";
-import { FieldValue } from "firebase-admin/firestore";
+import { KmsError } from "@/lib/kms/client";
+import { createUser, deleteUser, findUserByEmail, getUser, listUsers, updateUser, type PortalUserInput } from "@/lib/kms/users";
 
 async function verifyAdmin() {
   const session = await getSession();
@@ -14,15 +14,8 @@ export async function GET() {
     return Response.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   }
 
-  const db = getAdminDb();
-  const snapshot = await db.collection("users").orderBy("createdAt", "desc").get();
-  const users = snapshot.docs.map((doc) => ({
-    ...doc.data(),
-    createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
-    lastLoginAt: doc.data().lastLoginAt?.toDate?.()?.toISOString() || null,
-  }));
-
-  return Response.json(users);
+  // 등록일 최신순 (KMS)
+  return Response.json(await listUsers());
 }
 
 export async function POST(request: Request) {
@@ -40,24 +33,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const db = getAdminDb();
-
-  const existing = await db
-    .collection("users")
-    .where("email", "==", email)
-    .limit(1)
-    .get();
-
-  if (!existing.empty) {
+  if (await findUserByEmail(email)) {
     return Response.json(
       { error: "이미 등록된 사용자입니다." },
       { status: 409 }
     );
   }
 
-  const docRef = db.collection("users").doc();
-  await docRef.set({
-    uid: docRef.id,
+  // uid 는 KMS 가 만든다. 처음 구글 로그인할 때 구글 uid 로 옮겨진다
+  const user = await createUser({
     email,
     name: name || email.split("@")[0],
     photoURL: null,
@@ -66,11 +50,9 @@ export async function POST(request: Request) {
     position: position || "",
     role: role || "member",
     isActive: true,
-    createdAt: FieldValue.serverTimestamp(),
-    lastLoginAt: null,
   });
 
-  return Response.json({ success: true, uid: docRef.id });
+  return Response.json({ success: true, uid: user.uid });
 }
 
 export async function PATCH(request: Request) {
@@ -85,11 +67,7 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "uid가 필요합니다." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(uid);
-  const userDoc = await userRef.get();
-
-  if (!userDoc.exists) {
+  if (!(await getUser(uid))) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
@@ -99,7 +77,12 @@ export async function PATCH(request: Request) {
     if (key in updates) filtered[key] = updates[key];
   }
 
-  await userRef.update(filtered);
+  try {
+    await updateUser(uid, filtered as PortalUserInput);
+  } catch (err) {
+    const status = err instanceof KmsError && err.status < 500 ? 400 : 500;
+    return Response.json({ error: err instanceof Error ? err.message : "수정 실패" }, { status });
+  }
   return Response.json({ success: true });
 }
 
@@ -115,14 +98,10 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "uid가 필요합니다." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  const userRef = db.collection("users").doc(uid);
-  const userDoc = await userRef.get();
-
-  if (!userDoc.exists) {
+  if (!(await getUser(uid))) {
     return Response.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  await userRef.delete();
+  await deleteUser(uid);
   return Response.json({ success: true });
 }

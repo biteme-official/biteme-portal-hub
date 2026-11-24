@@ -71,6 +71,7 @@ async function send(kind, records) {
 
 const since = new Date(Date.now() - NOTIFICATION_DAYS * 24 * 60 * 60 * 1000);
 
+const users = await read("users");
 const approvals = await read("approvals");
 const templates = await read("approval_templates");
 const delegations = (await read("delegations")).map((d) => ({ ...d, ownerUid: d.ownerUid || d.id }));
@@ -80,7 +81,7 @@ const notifications = await read(
 );
 
 console.log(`대상: ${WRITE ? "KMS 에 씀" : "확인만 (쓰기 없음)"} → ${process.env.KMS_API_URL}`);
-console.log(`  결재 ${approvals.length}건, 양식 ${templates.length}건, 대결 ${delegations.length}건, 알림 ${notifications.length}건 (최근 ${NOTIFICATION_DAYS}일)`);
+console.log(`  직원 ${users.length}명, 결재 ${approvals.length}건, 양식 ${templates.length}건, 대결 ${delegations.length}건, 알림 ${notifications.length}건 (최근 ${NOTIFICATION_DAYS}일)`);
 
 const byStatus = {};
 for (const a of approvals) byStatus[a.status] = (byStatus[a.status] || 0) + 1;
@@ -95,4 +96,5 @@ console.log("  결재", await send("approvals", approvals), "건 완료");
 console.log("  양식", await send("templates", templates), "건 완료");
 console.log("  대결", await send("delegations", delegations), "건 완료");
 console.log("  알림", await send("notifications", notifications), "건 완료");
+console.log("  직원", await send("users", users), "명 완료");
 console.log("이관 끝.");

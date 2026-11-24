@@ -1,6 +1,6 @@
 import "server-only";
-import { getAdminDb } from "@/lib/firebase/admin";
 import { kms } from "@/lib/kms/client";
+import { getUser, listUsers } from "@/lib/kms/users";
 import { sendSlackDm } from "./slack";
 import type { NotificationType } from "@/lib/types/notification";
 
@@ -17,15 +17,8 @@ interface NotifyParams {
 
 async function getEmailsByUids(uids: string[]): Promise<string[]> {
   if (uids.length === 0) return [];
-  const db = getAdminDb();
-  const emails: string[] = [];
-  for (const uid of uids) {
-    const doc = await db.collection("users").doc(uid).get();
-    if (doc.exists) {
-      emails.push(doc.data()!.email);
-    }
-  }
-  return emails;
+  const users = await Promise.all(uids.map((uid) => getUser(uid).catch(() => null)));
+  return users.filter((u) => u !== null).map((u) => u!.email);
 }
 
 export async function dispatchNotification(params: NotifyParams) {
@@ -139,14 +132,7 @@ export async function notifyNewUserRegistered(
   userUid?: string
 ) {
   console.log(`notifyNewUserRegistered called: ${userName} (${userEmail})`);
-  const db = getAdminDb();
-  const adminsSnap = await db
-    .collection("users")
-    .where("role", "==", "admin")
-    .where("isActive", "==", true)
-    .get();
-
-  const adminUids = adminsSnap.docs.map((doc) => doc.id);
+  const adminUids = (await listUsers({ role: "admin", active: true })).map((u) => u.uid);
   console.log(`notifyNewUserRegistered: found ${adminUids.length} active admins: ${adminUids.join(",")}`);
   if (adminUids.length === 0) {
     console.warn("notifyNewUserRegistered: no active admins found, skipping");
