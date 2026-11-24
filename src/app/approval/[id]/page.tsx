@@ -16,6 +16,7 @@ import {
   Link2,
   UserRoundCog,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import StatusBadge from "@/components/approval/StatusBadge";
 import { StampLineDisplay } from "@/components/approval/StampLine";
@@ -491,11 +492,23 @@ export default function ApprovalDetailPage() {
               </button>
             )}
 
+            {approval.status === "draft" && isRequester && (
+              <Link
+                href={`/approval/new?draft=${encodeURIComponent(approval.id)}`}
+                className={`flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors ${
+                  canApprove || canCancel ? "mt-3" : ""
+                }`}
+              >
+                <Pencil size={14} />
+                수정 · 제출
+              </Link>
+            )}
+
             {(approval.status === "draft" && isRequester) || isAdmin ? (
               <button
                 onClick={handleDelete}
                 className={`flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors ${
-                  canApprove || canCancel ? "mt-3" : ""
+                  canApprove || canCancel || (approval.status === "draft" && isRequester) ? "mt-3" : ""
                 }`}
               >
                 <Trash2 size={14} />

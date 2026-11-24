@@ -1,6 +1,5 @@
-import { getAdminDb } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/auth/session";
-import { FieldValue } from "firebase-admin/firestore";
+import { kms } from "@/lib/kms/client";
 
 export async function GET() {
   const session = await getSession();
@@ -8,19 +7,7 @@ export async function GET() {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const db = getAdminDb();
-  const snapshot = await db
-    .collection("approval_templates")
-    .where("ownerUid", "==", session.uid)
-    .orderBy("createdAt", "desc")
-    .get();
-
-  const templates = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-    createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || "",
-  }));
-
+  const templates = await kms("/templates", { actorUid: session.uid });
   return Response.json(templates);
 }
 
@@ -39,18 +26,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "결재자를 1명 이상 지정해주세요." }, { status: 400 });
   }
 
-  const db = getAdminDb();
-  const docRef = db.collection("approval_templates").doc();
-  await docRef.set({
-    ownerUid: session.uid,
-    name: name.trim(),
-    approvers,
-    ccList: ccList || [],
-    category: category || "기타",
-    createdAt: FieldValue.serverTimestamp(),
-  });
-
-  return Response.json({ id: docRef.id });
+  try {
+    const res = await kms<{ id: string }>("/templates", {
+      method: "POST",
+      actorUid: session.uid,
+      body: { name: name.trim(), approvers, ccList: ccList || [], category: category || "기타" },
+    });
+    return Response.json({ id: res.id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "저장 실패";
+    return Response.json({ error: message }, { status: 400 });
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -60,13 +46,10 @@ export async function DELETE(request: Request) {
   }
 
   const { id } = await request.json();
-  const db = getAdminDb();
-  const doc = await db.collection("approval_templates").doc(id).get();
-
-  if (!doc.exists || doc.data()?.ownerUid !== session.uid) {
+  try {
+    await kms(`/templates/${encodeURIComponent(id)}`, { method: "DELETE", actorUid: session.uid });
+  } catch {
     return Response.json({ error: "권한이 없습니다." }, { status: 403 });
   }
-
-  await db.collection("approval_templates").doc(id).delete();
   return Response.json({ success: true });
 }

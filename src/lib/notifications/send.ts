@@ -1,6 +1,6 @@
 import "server-only";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { kms } from "@/lib/kms/client";
 import { sendSlackDm } from "./slack";
 import type { NotificationType } from "@/lib/types/notification";
 
@@ -29,27 +29,22 @@ async function getEmailsByUids(uids: string[]): Promise<string[]> {
 }
 
 export async function dispatchNotification(params: NotifyParams) {
-  const db = getAdminDb();
-  const batch = db.batch();
+  if (params.recipientUids.length === 0) return;
 
-  for (const uid of params.recipientUids) {
-    const docRef = db.collection("notifications").doc();
-    const doc: Record<string, unknown> = {
-      recipientUid: uid,
+  // 인앱 알림은 KMS 에 저장
+  await kms("/notifications", {
+    method: "POST",
+    body: {
+      recipientUids: params.recipientUids,
       type: params.type,
       title: params.title,
       body: params.body,
-      isRead: false,
-      createdAt: FieldValue.serverTimestamp(),
-    };
-    if (params.approvalId) doc.approvalId = params.approvalId;
-    if (params.approvalTitle) doc.approvalTitle = params.approvalTitle;
-    if (params.linkUrl) doc.linkUrl = params.linkUrl;
-    if (params.targetUserUid) doc.targetUserUid = params.targetUserUid;
-    batch.set(docRef, doc);
-  }
-
-  await batch.commit();
+      approvalId: params.approvalId || null,
+      approvalTitle: params.approvalTitle || null,
+      linkUrl: params.linkUrl || null,
+      targetUserUid: params.targetUserUid || null,
+    },
+  });
 
   try {
     const emails = await getEmailsByUids(params.recipientUids);

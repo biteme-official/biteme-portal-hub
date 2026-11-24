@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { importRecords } from "@/lib/firestore/approvals";
 
 const TEST_APPROVALS = [
   {
@@ -61,8 +61,11 @@ export async function POST() {
 
   const created: string[] = [];
 
+  const records: Record<string, unknown>[] = [];
+  const nowIso = new Date().toISOString();
+
   for (const t of TEST_APPROVALS) {
-    const docRef = db.collection("approvals").doc();
+    const id = crypto.randomUUID();
 
     const fakeRequester = {
       uid: `test-${t.requesterName}`,
@@ -82,7 +85,8 @@ export async function POST() {
       },
     ];
 
-    await docRef.set({
+    records.push({
+      id,
       title: t.title,
       description: t.description,
       category: t.category,
@@ -94,14 +98,17 @@ export async function POST() {
       ccList: [],
       attachments: [],
       comments: [],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      submittedAt: FieldValue.serverTimestamp(),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      submittedAt: nowIso,
       completedAt: null,
     });
 
-    created.push(docRef.id);
+    created.push(id);
   }
+
+  // 테스트 결재는 KMS 에 저장
+  await importRecords("approvals", records);
 
   return Response.json({
     message: `테스트 결재 ${created.length}건 생성 완료`,

@@ -1,5 +1,5 @@
 import "server-only";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { listApprovals } from "@/lib/firestore/approvals";
 
 interface ApprovalSummaryItem {
   id: string;
@@ -26,35 +26,26 @@ const STATUS_KR: Record<string, string> = {
 };
 
 export async function buildApprovalContext(userUid?: string): Promise<string> {
-  const db = getAdminDb();
-  const snapshot = await db
-    .collection("approvals")
-    .orderBy("createdAt", "desc")
-    .limit(50)
-    .get();
+  // 최근 50건 (KMS)
+  const approvals = await listApprovals({ limit: 50 });
+  if (approvals.length === 0) return "";
 
-  if (snapshot.empty) return "";
-
-  const items: ApprovalSummaryItem[] = snapshot.docs.map((doc) => {
-    const d = doc.data();
-    return {
-      id: doc.id,
-      title: d.title,
-      status: d.status,
-      category: d.category || "기타",
-      isUrgent: d.isUrgent || false,
-      requesterName: d.requester?.name || "",
-      requesterDept: d.requester?.department || "",
-      approvers: (d.approvalLine || []).map(
-        (s: { approver: { name: string }; status: string }) =>
-          `${s.approver.name}(${STATUS_KR[s.status] || s.status})`
-      ),
-      ccList: (d.ccList || []).map((c: { name: string }) => c.name),
-      createdAt: d.createdAt?.toDate?.()?.toISOString() || "",
-      submittedAt: d.submittedAt?.toDate?.()?.toISOString() || null,
-      completedAt: d.completedAt?.toDate?.()?.toISOString() || null,
-    };
-  });
+  const items: ApprovalSummaryItem[] = approvals.map((d) => ({
+    id: d.id,
+    title: d.title,
+    status: d.status,
+    category: d.category || "기타",
+    isUrgent: d.isUrgent || false,
+    requesterName: d.requester?.name || "",
+    requesterDept: d.requester?.department || "",
+    approvers: (d.approvalLine || []).map(
+      (s) => `${s.approver.name}(${STATUS_KR[s.status] || s.status})`
+    ),
+    ccList: (d.ccList || []).map((c) => c.name),
+    createdAt: d.createdAt || "",
+    submittedAt: d.submittedAt || null,
+    completedAt: d.completedAt || null,
+  }));
 
   const statusCounts: Record<string, number> = {};
   for (const item of items) {
@@ -66,20 +57,18 @@ export async function buildApprovalContext(userUid?: string): Promise<string> {
     ? items.filter(
         (i) =>
           i.requesterName !== "" &&
-          snapshot.docs.some(
-            (doc) => doc.id === i.id && doc.data().requester?.uid === userUid
+          approvals.some(
+            (d) => d.id === i.id && d.requester?.uid === userUid
           )
       )
     : [];
 
   const myPendingApproval = userUid
     ? items.filter((i) =>
-        snapshot.docs.some((doc) => {
-          if (doc.id !== i.id) return false;
-          const line = doc.data().approvalLine || [];
-          return line.some(
-            (s: { approver: { uid: string }; status: string }) =>
-              s.approver.uid === userUid && s.status === "current"
+        approvals.some((d) => {
+          if (d.id !== i.id) return false;
+          return (d.approvalLine || []).some(
+            (s) => s.approver.uid === userUid && s.status === "current"
           );
         })
       )

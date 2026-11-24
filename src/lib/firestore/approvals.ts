@@ -1,6 +1,6 @@
 import "server-only";
-import { getAdminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+// 파일 위치는 그대로 두었지만 결재 데이터는 이제 Firestore 가 아니라 KMS API 에 있다 (src/lib/kms/client.ts)
+import { kms, kmsAll, KmsError } from "@/lib/kms/client";
 import type {
   ApprovalRequest,
   ApprovalFormData,
@@ -8,115 +8,57 @@ import type {
   ApprovalStatus,
 } from "@/lib/types/approval";
 
-function tsToString(ts: FirebaseFirestore.Timestamp | null): string | null {
-  return ts?.toDate?.()?.toISOString() ?? null;
-}
-
-function docToApproval(
-  doc: FirebaseFirestore.DocumentSnapshot
-): ApprovalRequest {
-  const d = doc.data()!;
-  return {
-    id: doc.id,
-    title: d.title,
-    description: d.description,
-    category: d.category,
-    isUrgent: d.isUrgent || false,
-    requester: d.requester,
-    status: d.status,
-    approvalLine: d.approvalLine || [],
-    currentStep: d.currentStep || 0,
-    ccList: d.ccList || [],
-    attachments: d.attachments || [],
-    comments: d.comments || [],
-    createdAt: tsToString(d.createdAt) || new Date().toISOString(),
-    updatedAt: tsToString(d.updatedAt) || new Date().toISOString(),
-    submittedAt: tsToString(d.submittedAt),
-    completedAt: tsToString(d.completedAt),
-    voteType: d.voteType || "none",
-    voteOptions: d.voteOptions || [],
-  };
-}
-
 export async function createApproval(
   data: ApprovalFormData,
   requester: UserRef
 ): Promise<string> {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc();
-
-  const approvalLine = data.approvers.map((approver, i) => ({
-    stepOrder: i + 1,
-    approver,
-    status: "waiting" as const,
-    comment: null,
-    decidedAt: null,
-  }));
-
-  await docRef.set({
-    title: data.title,
-    description: data.description,
-    category: data.category,
-    isUrgent: data.isUrgent || false,
-    requester,
-    status: "draft",
-    approvalLine,
-    currentStep: 0,
-    ccList: data.ccList || [],
-    attachments: data.attachments || [],
-    comments: [],
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-    submittedAt: null,
-    completedAt: null,
-    voteType: data.voteType || "none",
-    voteOptions: data.voteOptions || [],
+  const res = await kms<{ id: string }>("/approvals", {
+    method: "POST",
+    actorUid: requester.uid,
+    body: { ...data, requester },
   });
-
-  return docRef.id;
+  return res.id;
 }
 
 export async function getApproval(
   id: string
 ): Promise<ApprovalRequest | null> {
-  const db = getAdminDb();
-  const doc = await db.collection("approvals").doc(id).get();
-  if (!doc.exists) return null;
-  return docToApproval(doc);
+  try {
+    return await kms<ApprovalRequest>(`/approvals/${encodeURIComponent(id)}`);
+  } catch (e) {
+    if (e instanceof KmsError && e.status === 404) return null;
+    throw e;
+  }
 }
 
 export async function listApprovals(filters: {
   requesterUid?: string;
   approverUid?: string;
   ccUid?: string;
-  status?: ApprovalStatus;
+  status?: ApprovalStatus | ApprovalStatus[];
+  limit?: number;
 }): Promise<ApprovalRequest[]> {
-  const db = getAdminDb();
-  const query = db.collection("approvals").orderBy("createdAt", "desc");
-  const snapshot = await query.get();
-  let results = snapshot.docs.map(docToApproval);
-
-  if (filters.requesterUid) {
-    results = results.filter((a) => a.requester.uid === filters.requesterUid);
+  const query = {
+    requester_uid: filters.requesterUid,
+    approver_uid: filters.approverUid,
+    cc_uid: filters.ccUid,
+    status: Array.isArray(filters.status) ? filters.status.join(",") : filters.status,
+  };
+  if (filters.limit) {
+    const res = await kms<{ data: ApprovalRequest[] }>("/approvals", {
+      query: { ...query, per_page: filters.limit },
+    });
+    return res.data;
   }
+  return kmsAll<ApprovalRequest>("/approvals", query);
+}
 
-  if (filters.status) {
-    results = results.filter((a) => a.status === filters.status);
-  }
-
-  if (filters.approverUid) {
-    results = results.filter((a) =>
-      a.approvalLine.some((step) => step.approver.uid === filters.approverUid)
-    );
-  }
-
-  if (filters.ccUid) {
-    results = results.filter((a) =>
-      a.ccList.some((cc) => cc.uid === filters.ccUid)
-    );
-  }
-
-  return results;
+/** 지금 내가 결재할 차례인 문서 (배지) */
+export async function listPendingForMe(uid: string) {
+  return kms<{
+    count: number;
+    items: { id: string; title: string; isUrgent: boolean; requesterName: string; category: string; createdAt: string }[];
+  }>("/approvals/pending", { actorUid: uid });
 }
 
 export async function updateDraft(
@@ -124,82 +66,15 @@ export async function updateDraft(
   requesterUid: string,
   data: Partial<ApprovalFormData>
 ) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-  const doc = await docRef.get();
-
-  if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-  const d = doc.data()!;
-  if (d.status !== "draft") throw new Error("임시저장 상태에서만 수정할 수 있습니다.");
-  if (d.requester.uid !== requesterUid) throw new Error("기안자만 수정할 수 있습니다.");
-
-  const updates: Record<string, unknown> = {
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-
-  if (data.title !== undefined) updates.title = data.title;
-  if (data.description !== undefined) updates.description = data.description;
-  if (data.category !== undefined) updates.category = data.category;
-  if (data.isUrgent !== undefined) updates.isUrgent = data.isUrgent;
-  if (data.attachments !== undefined) updates.attachments = data.attachments;
-  if (data.ccList !== undefined) updates.ccList = data.ccList;
-  if (data.voteType !== undefined) updates.voteType = data.voteType;
-  if (data.voteOptions !== undefined) updates.voteOptions = data.voteOptions;
-  if (data.approvers !== undefined) {
-    updates.approvalLine = data.approvers.map((approver, i) => ({
-      stepOrder: i + 1,
-      approver,
-      status: "waiting",
-      comment: null,
-      decidedAt: null,
-    }));
-  }
-
-  await docRef.update(updates);
+  await kms(`/approvals/${encodeURIComponent(id)}`, { method: "PATCH", actorUid: requesterUid, body: data });
 }
 
 export async function deleteDraft(id: string, requesterUid: string) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-  const doc = await docRef.get();
-
-  if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-  const d = doc.data()!;
-  if (d.status !== "draft") throw new Error("임시저장 상태에서만 삭제할 수 있습니다.");
-  if (d.requester.uid !== requesterUid) throw new Error("기안자만 삭제할 수 있습니다.");
-
-  await docRef.delete();
+  await kms(`/approvals/${encodeURIComponent(id)}`, { method: "DELETE", actorUid: requesterUid });
 }
 
 export async function submitApproval(id: string, requesterUid: string) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(docRef);
-    if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-    const d = doc.data()!;
-    if (d.status !== "draft") throw new Error("임시저장 상태에서만 제출할 수 있습니다.");
-    if (d.requester.uid !== requesterUid) throw new Error("기안자만 제출할 수 있습니다.");
-    if (!d.approvalLine || d.approvalLine.length === 0) {
-      throw new Error("승인자를 1명 이상 지정해야 합니다.");
-    }
-
-    const updatedLine = d.approvalLine.map(
-      (step: Record<string, unknown>, i: number) => ({
-        ...step,
-        status: i === 0 ? "current" : "waiting",
-      })
-    );
-
-    tx.update(docRef, {
-      status: "pending",
-      currentStep: 1,
-      approvalLine: updatedLine,
-      submittedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  });
+  await kms(`/approvals/${encodeURIComponent(id)}/submit`, { method: "POST", actorUid: requesterUid });
 }
 
 export async function decideStep(
@@ -209,126 +84,24 @@ export async function decideStep(
   comment?: string,
   vote?: { selectedOption?: string | null; yesNoVote?: boolean | null }
 ) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(docRef);
-    if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-    const d = doc.data()!;
-
-    if (d.status !== "pending" && d.status !== "in_progress") {
-      throw new Error("결재 진행 중인 문서만 처리할 수 있습니다.");
-    }
-
-    const currentIdx = d.currentStep - 1;
-    const currentStepData = d.approvalLine[currentIdx];
-
-    let isDelegated = false;
-    if (!currentStepData) {
-      throw new Error("현재 결재 순서가 아닙니다.");
-    }
-
-    if (currentStepData.approver.uid !== approverUid) {
-      const delegationDoc = await tx.get(
-        db.collection("delegations").doc(currentStepData.approver.uid)
-      );
-      if (
-        delegationDoc.exists &&
-        delegationDoc.data()?.delegateTo?.uid === approverUid &&
-        delegationDoc.data()?.isActive
-      ) {
-        isDelegated = true;
-      } else {
-        throw new Error("현재 결재 순서가 아닙니다.");
-      }
-    }
-
-    const updatedLine = [...d.approvalLine];
-    updatedLine[currentIdx] = {
-      ...currentStepData,
-      status: action === "approve" ? "approved" : "rejected",
-      comment: comment || null,
-      decidedAt: new Date().toISOString(),
-      ...(isDelegated ? { delegatedBy: approverUid } : {}),
-      ...(vote?.selectedOption !== undefined ? { selectedOption: vote.selectedOption } : {}),
-      ...(vote?.yesNoVote !== undefined ? { yesNoVote: vote.yesNoVote } : {}),
-    };
-
-    if (action === "reject") {
-      tx.update(docRef, {
-        status: "rejected",
-        approvalLine: updatedLine,
-        completedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      return;
-    }
-
-    const nextStep = d.currentStep + 1;
-    const isLastStep = nextStep > d.approvalLine.length;
-
-    if (isLastStep) {
-      tx.update(docRef, {
-        status: "approved",
-        currentStep: d.currentStep,
-        approvalLine: updatedLine,
-        completedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    } else {
-      updatedLine[nextStep - 1] = {
-        ...updatedLine[nextStep - 1],
-        status: "current",
-      };
-      tx.update(docRef, {
-        status: "in_progress",
-        currentStep: nextStep,
-        approvalLine: updatedLine,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    }
+  await kms(`/approvals/${encodeURIComponent(id)}/decide`, {
+    method: "POST",
+    actorUid: approverUid,
+    body: { action, comment: comment || null, ...(vote ?? {}) },
   });
 }
 
 export async function deleteApprovalAsAdmin(id: string) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-  const doc = await docRef.get();
-  if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-  await docRef.delete();
+  await kms(`/approvals/${encodeURIComponent(id)}`, { method: "DELETE", query: { admin: 1 } });
 }
 
 export async function deleteAllApprovals(): Promise<number> {
-  const db = getAdminDb();
-  const snapshot = await db.collection("approvals").get();
-  if (snapshot.empty) return 0;
-
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-  await batch.commit();
-  return snapshot.size;
+  const res = await kms<{ deleted: number }>("/approvals", { method: "DELETE" });
+  return res.deleted;
 }
 
 export async function cancelApproval(id: string, requesterUid: string) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-
-  await db.runTransaction(async (tx) => {
-    const doc = await tx.get(docRef);
-    if (!doc.exists) throw new Error("결재 문서를 찾을 수 없습니다.");
-    const d = doc.data()!;
-    if (d.requester.uid !== requesterUid) throw new Error("기안자만 취소할 수 있습니다.");
-    if (d.status !== "pending" && d.status !== "in_progress") {
-      throw new Error("진행 중인 결재만 취소할 수 있습니다.");
-    }
-
-    tx.update(docRef, {
-      status: "canceled",
-      completedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  });
+  await kms(`/approvals/${encodeURIComponent(id)}/cancel`, { method: "POST", actorUid: requesterUid });
 }
 
 export async function addComment(
@@ -336,16 +109,30 @@ export async function addComment(
   author: UserRef,
   text: string
 ) {
-  const db = getAdminDb();
-  const docRef = db.collection("approvals").doc(id);
-
-  await docRef.update({
-    comments: FieldValue.arrayUnion({
-      id: crypto.randomUUID(),
-      author,
-      text,
-      createdAt: new Date().toISOString(),
-    }),
-    updatedAt: FieldValue.serverTimestamp(),
+  await kms(`/approvals/${encodeURIComponent(id)}/comments`, {
+    method: "POST",
+    actorUid: author.uid,
+    body: { author, text },
   });
+}
+
+/** 지금 내 차례인 결재 1건을 다른 사람에게 넘긴다 */
+export async function delegateStep(
+  id: string,
+  actor: { uid: string; name: string },
+  delegateTo: UserRef
+) {
+  await kms(`/approvals/${encodeURIComponent(id)}/delegate`, {
+    method: "POST",
+    actorUid: actor.uid,
+    body: { actorName: actor.name, delegateTo },
+  });
+}
+
+/** Firestore 이관·테스트 데이터용: 포털 형식 그대로 id 기준 덮어쓰기 */
+export async function importRecords(
+  kind: "approvals" | "templates" | "delegations" | "notifications",
+  records: Record<string, unknown>[]
+) {
+  return kms<{ imported: number }>(`/import/${kind}`, { method: "POST", body: { records } });
 }
